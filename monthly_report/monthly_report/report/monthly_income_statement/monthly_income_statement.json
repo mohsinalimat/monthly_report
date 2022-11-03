@@ -32,7 +32,6 @@
             "fieldname": "print_group",
             "fieldtype": "Select",
             "label": "Print Group",
-            "options": ["01", "02"],
             "mandatory": 0,
             "wildcard_filter": 0
         }
