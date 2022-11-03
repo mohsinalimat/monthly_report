@@ -1,17 +1,13 @@
-// Copyright (c) 2022, abayomi.awosusi@sgatechsolutions.com and contributors
-// For license information, please see license.txt
-/* eslint-disable */
-
 frappe.query_reports["Monthly Income Statement"] = {
 	"filters": [
 		{
-            fieldname: 'company',
-            label: __('Company'),
-            fieldtype: 'Link',
-            options: 'Company',
-            default: frappe.defaults.get_user_default('company'),
+			fieldname: 'company',
+			label: __('Company'),
+			fieldtype: 'Link',
+			options: 'Company',
+			default: frappe.defaults.get_user_default('company'),
 			hidden: 1
-        },
+		},
 		{
 			fieldname: "from_date",
 			label: __("From Date"),
@@ -19,11 +15,11 @@ frappe.query_reports["Monthly Income Statement"] = {
 			hidden: 1
 		},
 		{
-			fieldname:"to_date",
+			fieldname: "to_date",
 			label: __("To Date"),
 			fieldtype: "Date",
 			default: frappe.defaults.get_user_default("year_end_date"),
-			reqd: 1,				
+			reqd: 1,
 		},
 		{
 			fieldname: "range",
@@ -42,8 +38,8 @@ frappe.query_reports["Monthly Income Statement"] = {
 			label: __("Cost Center"),
 			fieldtype: "Link",
 			options: "Cost Center",
-			reqd:0,				
-			get_data: function(txt) {				
+			reqd: 0,
+			get_data: function (txt) {
 				return frappe.db.get_link_options("Cost Center", txt);
 			}
 		}
@@ -65,7 +61,7 @@ frappe.query_reports["Monthly Income Statement"] = {
 				callback: function (r) {
 					$(".report-wrapper").html("");
 					$(".justify-center").remove()
-                    //console.log(r)
+					//console.log(r)
 					if (r.message[2] != "") {
 						var fiscal_endDt = new Date(frappe.defaults.get_user_default("year_end_date"))
 						var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -164,7 +160,7 @@ function row_celldynFunc(cnt_list, weekNo, colDt) {
 
 // total amount of week according to month
 function totalAmt_permthweeks(cnt_list, colDt) {
-	celldynhtml =  '<td style="font-weight: bold;">Mth End</td>';
+	celldynhtml = '<td style="font-weight: bold;">Mth End</td>';
 
 	for (var col = 0; col < colDt.length; col++) {
 		var iscol_exist = false
@@ -225,10 +221,10 @@ function year_totalamt(cnt_list, cstcntrNm, colDt) {
 							}
 						})
 					})
+
 					if (iscol_exist == true) {
 						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
-					}
-					else {
+					} else {
 						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$0</td>';
 					}
 				}
@@ -295,11 +291,11 @@ Content-Type: text/xml; charset="utf-8"
 </xml>
 ------=_NextPart_dummy--
 `,
-		base64 = function (s) { 
-			return window.btoa(unescape(encodeURIComponent(s))) 
+		base64 = function (s) {
+			return window.btoa(unescape(encodeURIComponent(s)))
 		},
-		format = function (s, c) { 
-			return s.replace(/{(\w+)}/g, function (m, p) { return c[p]; }) 
+		format = function (s, c) {
+			return s.replace(/{(\w+)}/g, function (m, p) { return c[p]; })
 		}
 
 	return function (tables, costcntr, filename) {
@@ -321,8 +317,8 @@ Content-Type: text/xml; charset="utf-8"
 				$.each(spltcostcntr, function (ind, val) {
 					SheetName += val.trim();
 				})
-			} else { 
-				SheetName = spltcostcntr[0]; 
+			} else {
+				SheetName = spltcostcntr[0];
 			}
 
 			if ($.trim(SheetName) === '') {
