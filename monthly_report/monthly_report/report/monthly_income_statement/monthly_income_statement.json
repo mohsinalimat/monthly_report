@@ -30,7 +30,7 @@
         },
         {
             "fieldname": "print_group",
-            "fieldtype": "Link",
+            "fieldtype": "Select",
             "label": "Print Group",
             "mandatory": 0,
             "wildcard_filter": 0

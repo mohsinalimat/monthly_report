@@ -46,7 +46,7 @@ frappe.query_reports["Monthly Income Statement"] = {
 		{
 			fieldname: "print_group",
 			label: __("Print Group"),
-			fieldtype: "Link",
+			fieldtype: "Select",
 			options: "Print Group",
 			reqd: 1,
 			get_data: function (txt) {
