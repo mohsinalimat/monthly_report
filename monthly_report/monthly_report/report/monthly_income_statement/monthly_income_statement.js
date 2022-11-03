@@ -5,21 +5,19 @@ frappe.query_reports["Monthly Income Statement"] = {
 			label: __('Company'),
 			fieldtype: 'Link',
 			options: 'Company',
-			default: frappe.defaults.get_user_default('company'),
-			hidden: 1
+			default: frappe.defaults.get_user_default('company')
 		},
 		{
 			fieldname: "from_date",
 			label: __("From Date"),
-			fieldtype: "Date",
-			hidden: 1
+			fieldtype: "Date"
 		},
 		{
 			fieldname: "to_date",
 			label: __("To Date"),
 			fieldtype: "Date",
 			default: frappe.defaults.get_user_default("year_end_date"),
-			reqd: 1,
+			reqd: 1
 		},
 		{
 			fieldname: "range",
@@ -30,8 +28,7 @@ frappe.query_reports["Monthly Income Statement"] = {
 				{ "value": "Monthly", "label": __("Monthly") }
 			],
 			default: "Weekly",
-			reqd: 1,
-			hidden: 1
+			reqd: 1
 		},
 		{
 			fieldname: "cost_center",
@@ -47,7 +44,10 @@ frappe.query_reports["Monthly Income Statement"] = {
 			fieldname: "print_group",
 			label: __("Print Group"),
 			fieldtype: "Select",
-			options: ["01", "02"],
+			options: [
+				{ "value": "Weekly", "label": __("Weekly") },
+				{ "value": "Monthly", "label": __("Monthly") }
+			],
 			reqd: 1,
 			get_data: function (txt) {
 				return frappe.db.get_link_options("Print Group", txt);
