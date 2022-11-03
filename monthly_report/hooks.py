@@ -116,8 +116,8 @@ app_license = "MIT"
 # 	"hourly": [
 # 		"monthly_report.tasks.hourly"
 # 	],
-# 	"weekly": [
-# 		"monthly_report.tasks.weekly"
+# 	"monthly": [
+# 		"monthly_report.tasks.monthly"
 # 	]
 # 	"monthly": [
 # 		"monthly_report.tasks.monthly"

@@ -1,7 +1,4 @@
-// Copyright (c) 2022, abayomi.awosusi@sgatechsolutions.com and contributors
-// For license information, please see license.txt
-
-frappe.ui.form.on('Weekly Sales Report', {
+frappe.ui.form.on('Monthly Income Statement', {
 	// refresh: function(frm) {
 
 	// }
