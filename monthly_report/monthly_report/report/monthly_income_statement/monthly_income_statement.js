@@ -55,7 +55,7 @@ frappe.query_reports["Monthly Income Statement"] = {
 			let filters = report.get_values();
 
 			frappe.call({
-				method: 'weekly_report.weekly_report.report.weekly_sales_report.weekly_sales_report.get_weekly_report_record',
+				method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_monthly_report_record',
 
 				args: {
 					report_name: report.report_name,

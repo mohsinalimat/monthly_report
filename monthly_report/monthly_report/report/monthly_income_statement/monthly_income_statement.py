@@ -269,7 +269,7 @@ class MonthlyIncomeStatement(object):
     
 sales_allrecord=[]
 @frappe.whitelist()
-def get_weekly_report_record(report_name,filters):
+def get_monthly_report_record(report_name,filters):
     from dateutil.relativedelta import MO, relativedelta
     # Skipping total row for tree-view reports
     skip_total_row = 0
