@@ -130,7 +130,7 @@ function dynamic_exportcontent(cnt_list, EDate, cost_center) {
 
 	$(".report-wrapper").hide();
 	$(".report-wrapper").append(dynhtml);
-	tablesToExcel(totlcnt, lstCstCntr, 'SalesWeeklyReport.xls')
+	tablesToExcel(totlcnt, lstCstCntr, 'MonthlyIncomeStatment.xls')
 }
 
 // filling cell values dynamically according to the selection
