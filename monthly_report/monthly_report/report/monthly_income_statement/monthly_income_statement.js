@@ -42,6 +42,16 @@ frappe.query_reports["Monthly Income Statement"] = {
 			get_data: function (txt) {
 				return frappe.db.get_link_options("Cost Center", txt);
 			}
+		},
+		{
+			fieldname: "print_group",
+			label: __("Print Group"),
+			fieldtype: "Link",
+			options: "Print Group",
+			reqd: 1,
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Print Group", txt);
+			}
 		}
 
 	],
