@@ -34,12 +34,12 @@
  "letter_head": "whitewood",
  "modified": "2022-10-26 08:50:49.915651",
  "modified_by": "Administrator",
- "module": "Monthly Report",
- "name": "Monthly Income Statement",
+ "module": "Weekly Report",
+ "name": "Weekly Sales Report",
  "owner": "Administrator",
  "prepared_report": 0,
- "ref_doctype": "Monthly Income Statement",
- "report_name": "Monthly Income Statement",
+ "ref_doctype": "Weekly Sales Report",
+ "report_name": "Weekly Sales Report",
  "report_type": "Script Report",
  "roles": [
   {

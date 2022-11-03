@@ -1,4 +1,8 @@
-frappe.query_reports["Monthly_Income_Statement"] = {
+// Copyright (c) 2022, abayomi.awosusi@sgatechsolutions.com and contributors
+// For license information, please see license.txt
+/* eslint-disable */
+
+frappe.query_reports["Weekly Sales Report"] = {
 	"filters": [
 		{
             fieldname: 'company',
@@ -51,7 +55,7 @@ frappe.query_reports["Monthly_Income_Statement"] = {
 			let filters = report.get_values();
 
 			frappe.call({
-				method: 'monthly_income_statement.monthly_income_statement.report.monthly_income_statement.monthly_income_statement.get_monthly_income_statement_record',
+				method: 'weekly_report.weekly_report.report.weekly_sales_report.weekly_sales_report.get_weekly_report_record',
 
 				args: {
 					report_name: report.report_name,

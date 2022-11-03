@@ -17,10 +17,10 @@ from datetime import date
 
 #
 def execute(filters=None):
-    return MonthlyIncomeStatement(filters).run()
+    return WeeklySales(filters).run()
 
 #
-class MonthlyIncomeStatement(object):
+class WeeklySales(object):
     def __init__(self, filters=None):
         self.filters = frappe._dict(filters or {})		
         self.date_field = (
@@ -92,11 +92,43 @@ class MonthlyIncomeStatement(object):
         #if self.filters.tree_type == "Cost Center":			
         self.get_sales_transactions_based_on_cost_center()			
         self.get_rows()			
+
         value_field = "base_net_total as value_field"
+        # if self.filters["value_quantity"] == "Value":
+        # 	value_field = "base_net_total as value_field"
+        # else:
+        # 	value_field = "total_qty as value_field"
+
         entity = "project as entity"	
+        # self.entries = frappe.get_all(
+        # 	self.filters.cost_center,
+        # 	fields=[entity, value_field, self.date_field],
+        # 	filters={
+        # 		"docstatus": 1,
+        # 		"company": self.filters.cost_center,
+        # 		"project": ["!=", ""],				
+        # 	},
+        # )
         
     def get_sales_transactions_based_on_cost_center(self):			
-        value_field = "base_amount"			
+        value_field = "base_amount"		
+        # self.entries = frappe.db.sql(
+        # 	"""
+        # 	(select distinct `tabSales Order`.grand_total,`tabSales Order Item`.item_group as entity,`tabSales Order`.cost_center, `tabSales Order`.name, 
+        # 	`tabSales Order Item`.base_amount as value_field,`tabSales Order`.transaction_date,
+        # 	`tabSales Order`.customer_name, `tabSales Order`.status,`tabSales Order`.delivery_status, 
+        # 	`tabSales Order`.billing_status,`tabSales Order Item`.delivery_date from `tabSales Order`, 
+        # 	`tabSales Order Item` where `tabSales Order`.name = `tabSales Order Item`.parent and 
+        # 	`tabSales Order`.status <> 'Cancelled' and  `tabSales Order`.cost_center = %(cost_center)s
+        # 	and `tabSales Order Item`.delivery_date <=  %(to_date)s
+        # 	)	
+        # """, {
+        # 		'cost_center': self.filters.cost_center,'from_date': self.filters.start_date ,'to_date':  self.filters.to_date				
+        # 	},		
+        # 	as_dict=1,
+        # )	
+        #print("c5")
+        #self.get_groups()		
         self.entries = frappe.db.sql(
         """
         (select distinct s.cost_center as entity, i.base_amount as value_field, s.transaction_date
@@ -237,7 +269,7 @@ class MonthlyIncomeStatement(object):
     
 sales_allrecord=[]
 @frappe.whitelist()
-def get_monthly_income_statement_record(report_name,filters):
+def get_weekly_report_record(report_name,filters):
     from dateutil.relativedelta import MO, relativedelta
     # Skipping total row for tree-view reports
     skip_total_row = 0
@@ -433,7 +465,7 @@ def get_monthly_income_statement_record(report_name,filters):
     #year_lis = list(year_total_list.items())  #convert dict to list
     year_lis = list(year_total_list2.items())
     
-    WSobj = MonthlyIncomeStatement()
+    WSobj = WeeklySales()
     WSobj.__init__()	
     compnyName=""	
     if sales_allrecord:
