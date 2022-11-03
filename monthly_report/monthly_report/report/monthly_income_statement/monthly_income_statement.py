@@ -17,10 +17,10 @@ from datetime import date
 
 #
 def execute(filters=None):
-    return WeeklySales(filters).run()
+    return MonthlyIncomeStatement(filters).run()
 
 #
-class WeeklySales(object):
+class MonthlyIncomeStatement(object):
     def __init__(self, filters=None):
         self.filters = frappe._dict(filters or {})		
         self.date_field = (
@@ -465,7 +465,7 @@ def get_weekly_report_record(report_name,filters):
     #year_lis = list(year_total_list.items())  #convert dict to list
     year_lis = list(year_total_list2.items())
     
-    WSobj = WeeklySales()
+    WSobj = MonthlyIncomeStatement()
     WSobj.__init__()	
     compnyName=""	
     if sales_allrecord:
