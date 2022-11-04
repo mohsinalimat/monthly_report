@@ -28,20 +28,7 @@ class MonthlyIncomeStatement(object):
             # if self.filters.doc_type in ["Sales Order", "Purchase Order"]
             # else "posting_date"
         )
-        self.months = [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-        ]		
+        self.months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]		
         self.get_period_date_ranges()
         #print("c1")
 
@@ -52,7 +39,6 @@ class MonthlyIncomeStatement(object):
     
         # Skipping total row for tree-view reports
         skip_total_row = 0
-
     
         return self.columns, self.data, None, None, skip_total_row
 
@@ -66,14 +52,14 @@ class MonthlyIncomeStatement(object):
                 "hidden":1
             }
         ]
-        self.columns.append(
-                {
-                    "label": "Backlog", 
-                    "fieldname": "Backlog", 
-                    "fieldtype": "data",
-                     "width": 120
-                }
-            )
+        self.columns.append (
+            {
+                "label": "Backlog", 
+                "fieldname": "Backlog", 
+                "fieldtype": "data",
+                "width": 120
+            }
+        )
         for end_date in self.periodic_daterange:
             period = self.get_period(end_date)					
             self.columns.append(
@@ -81,10 +67,10 @@ class MonthlyIncomeStatement(object):
                     "label": _(period), 
                     "fieldname": scrub(period), 
                     "fieldtype": "Float",
-                     "width": 120
+                    "width": 120
                 }
             )
-        self.columns.append(
+        self.columns.append (
             {"label": _("Total"), "fieldname": "total", "fieldtype": "Float", "width": 120}
         )
 
@@ -114,33 +100,38 @@ class MonthlyIncomeStatement(object):
         value_field = "base_amount"		
         # self.entries = frappe.db.sql(
         # 	"""
-        # 	(select distinct `tabSales Order`.grand_total,`tabSales Order Item`.item_group as entity,`tabSales Order`.cost_center, `tabSales Order`.name, 
+        # 	(SELECT distinct `tabSales Order`.grand_total,`tabSales Order Item`.item_group as entity,`tabSales Order`.cost_center, `tabSales Order`.name, 
         # 	`tabSales Order Item`.base_amount as value_field,`tabSales Order`.transaction_date,
         # 	`tabSales Order`.customer_name, `tabSales Order`.status,`tabSales Order`.delivery_status, 
         # 	`tabSales Order`.billing_status,`tabSales Order Item`.delivery_date from `tabSales Order`, 
-        # 	`tabSales Order Item` where `tabSales Order`.name = `tabSales Order Item`.parent and 
-        # 	`tabSales Order`.status <> 'Cancelled' and  `tabSales Order`.cost_center = %(cost_center)s
-        # 	and `tabSales Order Item`.delivery_date <=  %(to_date)s
+        # 	`tabSales Order Item` WHERE `tabSales Order`.name = `tabSales Order Item`.parent AND 
+        # 	`tabSales Order`.status <> 'Cancelled' AND `tabSales Order`.cost_center = %(cost_center)s
+        # 	AND `tabSales Order Item`.delivery_date <=  %(to_date)s
         # 	)	
         # """, {
-        # 		'cost_center': self.filters.cost_center,'from_date': self.filters.start_date ,'to_date':  self.filters.to_date				
+        # 		'cost_center': self.filters.cost_center,'from_date': self.filters.start_date,'to_date':  self.filters.to_date				
         # 	},		
         # 	as_dict=1,
         # )	
         #print("c5")
         #self.get_groups()		
-        self.entries = frappe.db.sql(
-        """
-        (select distinct s.cost_center as entity, i.base_amount as value_field, s.transaction_date
-         from `tabSales Order` s,`tabSales Order Item` i 
-         where s.name = i.parent and 
-        s.status <> 'Cancelled' and  s.cost_center = %(cost_center)s
-        and i.delivery_date <=  %(to_date)s
-        )	
-        """, {
-                'cost_center': self.filters.cost_center,'from_date': self.filters.start_date ,'to_date':  self.filters.to_date				
-            },		
-            as_dict=1,
+        self.entries = frappe.db.sql (
+            """
+            SELECT 
+                distinct s.cost_center as entity, 
+                i.base_amount as value_field, 
+                s.transaction_date
+            FROM    
+                `tabSales Order` s,
+                `tabSales Order Item` i 
+            WHERE 
+                s.name = i.parent AND 
+                s.status <> 'Cancelled' AND 
+                s.cost_center = %(cost_center)s AND 
+                i.delivery_date <= %(to_date)s
+            """, {
+                'cost_center': self.filters.cost_center,'from_date': self.filters.start_date,'to_date':  self.filters.to_date				
+            }, as_dict=1,
         )	
 
     def get_rows(self):
@@ -302,110 +293,185 @@ def get_monthly_report_record(report_name,filters):
 
     #print("c13")
     if filters.cost_center:	
-        sales_allrecord = frappe.db.sql(
+        sales_allrecord = frappe.db.sql (
             """
-            select X.* from (select 'Consolidated' as entity, i.base_amount as value_field, s.transaction_date, 
-            s.company from `tabSales Order` s,
-            `tabSales Order Item` i where s.name = i.parent and s.status <> 'Cancelled'and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and  s.cost_center = %(cost_center)s
-            and s.transaction_date between  %(from_date)s and %(to_date)s 				
-            union
-            select s.cost_center as entity, i.base_amount as value_field, s.transaction_date,s.company
-            from `tabSales Order` s,`tabSales Order Item` i 
-            where s.name = i.parent and 
-            s.status <> 'Cancelled' 
-            and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and  s.cost_center = %(cost_center)s
-            and s.transaction_date between  %(from_date)s and %(to_date)s 
+            SELECT 
+                X.* 
+            FROM (
+                SELECT 
+                    'Consolidated' as entity, 
+                    i.base_amount as value_field, 
+                    s.transaction_date, 
+                    s.company FROM `tabSales Order` s,
+                    `tabSales Order Item` i 
+                WHERE 
+                    s.name = i.parent AND
+                    s.status <> 'Cancelled'AND
+                    s.delivery_status='Not Delivered' AND
+                    s.billing_status='Not Billed' AND 
+                    s.cost_center = %(cost_center)s AND 
+                    s.transaction_date between %(from_date)s AND 
+                    %(to_date)s
+                UNION
+                SELECT 
+                    s.cost_center as entity, 
+                    s.transaction_date,s.company
+                    i.base_amount as value_field, 
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i 
+                WHERE 
+                    s.name = i.parent AND 
+                    s.status <> 'Cancelled' AND 
+                    s.delivery_status='Not Delivered' AND 
+                    s.billing_status='Not Billed'AND 
+                    s.cost_center = %(cost_center)s AND 
+                    s.transaction_date between %(from_date)s AND 
+                    %(to_date)s 
             ) X
             """, {
-                    'cost_center': filters.cost_center,'from_date': filters.from_date,'to_date': end_date				
-                },		
-                as_dict=1,
-            )	
-        min_date_backlog = frappe.db.sql(
-                """
-                select M.*
-                    from (select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, 'Consolidated' as cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date 		
-                    and  s.cost_center = %(cost_center)s			
-                    group by month(s.transaction_date), fy.year					
-                    UNION
-                    select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, s.cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i , `tabFiscal Year` fy
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date 
-                    and  s.cost_center = %(cost_center)s
-                    group by month(s.transaction_date), fy.year,s.cost_center					
-                                
-                ) M	
-            """, {
-                    'before_date': start_date	,'b':'%b','cost_center': filters.cost_center,'Y':'%y','prevstart_date' : prevyrsstartdate			
-                },		
-                as_dict=1,
-            )			
-    else:
-        sales_allrecord = frappe.db.sql(
+                'cost_center': filters.cost_center,'from_date': filters.from_date,'to_date': end_date				
+            }, as_dict=1,
+        )
+
+        min_date_backlog = frappe.db.sql (
             """
-            select X.*
-            from (select 'Consolidated' as entity, i.base_amount as value_field, s.transaction_date, s.company from `tabSales Order` s,
-            `tabSales Order Item` i where s.name = i.parent and s.status <> 'Cancelled'and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and s.transaction_date between  %(from_date)s and %(to_date)s 			
-            UNION
-            select s.cost_center as entity, i.base_amount as value_field, s.transaction_date, s.company
-            from `tabSales Order` s,`tabSales Order Item` i 
-            where s.name = i.parent and 
-            s.status <> 'Cancelled'
-            and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and s.transaction_date between  %(from_date)s and %(to_date)s 
-                ) X
-            """, {
-                    'from_date': start_date,'to_date': filters.to_date				
-                },		
-                as_dict=1,
-            )	
-        min_date_backlog = frappe.db.sql(
-                    """
-                    select M.*
-                    from (select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, 'Consolidated' as cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date
+            SELECT 
+                M.*
+            FROM (
+                SELECT 
+                    CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                    fy.year as year, sum(i.base_amount) AS TotalAmt, 
+                    'Consolidated' as cost_center
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i, 
+                    `tabFiscal Year` fy 
+                WHERE 
+                    s.name = i.parent AND 
+                    s.status <> 'Cancelled'AND 
+                    s.delivery_status='Not Delivered' AND 
+                    s.billing_status='Not Billed'AND 
+                    s.transaction_date < %(before_date)s AND 
+                    s.transaction_date >= %(prevstart_date)s AND 
+                    s.transaction_date >= fy.year_start_date AND s.transaction_date <= fy.year_end_date AND 
+                    s.cost_center = %(cost_center)s			
                     group by month(s.transaction_date), fy.year					
-                    UNION
-                    select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, s.cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date
+                UNION
+                SELECT 
+                    CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                    fy.year as year, sum(i.base_amount) AS TotalAmt, 
+                    s.cost_center
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i, 
+                    `tabFiscal Year` fy
+                WHERE 
+                    s.name = i.parent AND
+                    s.status <> 'Cancelled'AND
+                    s.delivery_status='Not Delivered' AND
+                    s.billing_status='Not Billed'AND
+                    s.transaction_date < %(before_date)s AND
+                    s.transaction_date >= %(prevstart_date)s AND
+                    s.transaction_date >= fy.year_start_date AND
+                    s.transaction_date <= fy.year_end_date AND
+                    s.cost_center = %(cost_center)s
                     group by month(s.transaction_date), fy.year,s.cost_center					
-                    ) M 						
-                """, {
-                        'before_date': start_date	,'b':'%b','Y':'%y','prevstart_date' : prevyrsstartdate				
-                    },		
-                    as_dict=1,
-                )	
+            ) M	
+            """, {
+                'before_date': start_date	,'b':'%b','cost_center': filters.cost_center,'Y':'%y','prevstart_date' : prevyrsstartdate			
+            }, as_dict=1,
+        )
+    else:
+        sales_allrecord = frappe.db.sql (
+            """
+            SELECT 
+                X.*
+            FROM (
+                    SELECT 'Consolidated' as entity, 
+                    i.base_amount as value_field, 
+                    s.transaction_date, 
+                    s.company FROM `tabSales Order` s,
+                    `tabSales Order Item` i 
+                WHERE 
+                    s.name = i.parent AND
+                    s.status <> 'Cancelled'AND
+                    s.delivery_status='Not Delivered' AND
+                    s.billing_status='Not Billed'AND
+                    s.transaction_date between %(from_date)s AND
+                    %(to_date)s		
+                UNION
+                SELECT 
+                    i.base_amount as value_field, 
+                    s.cost_center as entity, 
+                    s.transaction_date, 
+                    s.company
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i 
+                WHERE 
+                    s.name = i.parent  AND
+                    s.status <> 'Cancelled' AND
+                    s.delivery_status='Not Delivered'  AND
+                    s.billing_status='Not Billed' AND
+                    s.transaction_date between %(from_date)s AND 
+                    %(to_date)s 
+            ) X
+            """, {
+                'from_date': start_date,'to_date': filters.to_date				
+            }, as_dict=1,
+        )
+
+        min_date_backlog = frappe.db.sql (
+            """
+            SELECT 
+                M.*
+            FROM (
+                SELECT 
+                    CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                    fy.year as year,
+                    sum(i.base_amount) AS TotalAmt, 
+                    'Consolidated' as cost_center
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i, 
+                    `tabFiscal Year` fy 
+                WHERE 
+                    s.name = i.parent AND 
+                    s.status <> 'Cancelled'AND
+                    s.delivery_status='Not Delivered' AND 
+                    s.billing_status='Not Billed' AND
+                    s.transaction_date < %(before_date)s AND 
+                    s.transaction_date >= %(prevstart_date)s AND
+                    s.transaction_date >= fy.year_start_date AND 
+                    s.transaction_date <= fy.year_end_date
+                    group by month(s.transaction_date), fy.year					
+                UNION
+                SELECT 
+                    CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                    fy.year as year,
+                    sum(i.base_amount) AS TotalAmt,
+                    s.cost_center
+                FROM 
+                    `tabSales Order` s,
+                    `tabSales Order Item` i, 
+                    `tabFiscal Year` fy 
+                WHERE 
+                    s.name = i.parent AND 
+                    s.status <> 'Cancelled'AND 
+                    s.delivery_status='Not Delivered' AND 
+                    s.billing_status='Not Billed'AND 
+                    s.transaction_date < %(before_date)s AND 
+                    s.transaction_date >= %(prevstart_date)sAND 
+                    s.transaction_date >= fy.year_start_date AND 
+                    s.transaction_date <= fy.year_end_date
+                    group by month(s.transaction_date), fy.year,s.cost_center					
+            ) M 						
+            """, {
+                'before_date': start_date	,'b':'%b','Y':'%y','prevstart_date' : prevyrsstartdate				
+            }, as_dict=1,
+        )
+
     year_total_list = frappe._dict()	
     for dd in min_date_backlog:		
         #print(dd)				
@@ -459,7 +525,6 @@ def get_monthly_report_record(report_name,filters):
             currdt2 = currdt + relativedelta(months=+1)
             currdt = currdt2
 
-
     #print(year_total_list2)        
     
     #year_lis = list(year_total_list.items())  #convert dict to list
@@ -489,13 +554,13 @@ def get_monthly_report_record(report_name,filters):
 #
 def cust_get_columns(filters,Cust_periodic_daterange):
     cust_columns=[
-            {
-                "label": "Backlog", 
-                "fieldname": "Backlog", 
-                "fieldtype": "data",
-                    "width": 120
-            }
-        ]
+        {
+            "label": "Backlog", 
+            "fieldname": "Backlog", 
+            "fieldtype": "data",
+            "width": 120
+        }
+    ]   
     for end_date in Cust_periodic_daterange:
         period = cust_get_period(end_date,filters)							
         cust_columns.append(
@@ -503,7 +568,7 @@ def cust_get_columns(filters,Cust_periodic_daterange):
                 "label": _(period), 
                 "fieldname": scrub(period), 
                 "fieldtype": "Float",
-                    "width": 120
+                "width": 120
             }
         )
     # cust_columns.append(
@@ -579,6 +644,7 @@ def cust_get_weekperiod(filters, posting_date):
     #print("c17")	
     return weekperiod
 
+
 def cust_get_allweekperiods(filters, start_date, end_date):
     from dateutil.relativedelta import relativedelta
     data = []
@@ -595,7 +661,6 @@ def cust_get_allweekperiods(filters, start_date, end_date):
     #print(data)    	
     return data
 
-
 #bind rows according to the record
 def cust_get_rows(filters,records,Cust_periodic_daterange):
     data = []	
@@ -611,6 +676,7 @@ def cust_get_rows(filters,records,Cust_periodic_daterange):
     
     #print("c18")
     return con_lis
+
 
 def cust_get_rows_forallweeks(filters,records,Cust_periodic_daterange,coycostcenters,from_date, to_date):
     data = []	
@@ -659,16 +725,19 @@ def cust_get_rows_forallweeks(filters,records,Cust_periodic_daterange,coycostcen
 def fetchselected_fiscalyear(end_date):
     fetch_fiscalyearslctn = frappe.db.sql(
         """
-        (select year_start_date , year_end_date from `tabFiscal Year` 
-        where  %(Slct_date)s between year_start_date and year_end_date
-        )	
-    """,{
+        SELECT 
+            year_start_date, 
+            year_end_date from `tabFiscal Year` 
+        WHERE
+            %(Slct_date)s between year_start_date AND 
+            year_end_date
+        """, {
             'Slct_date': end_date
-        },		
-        as_dict=1,
+        }, as_dict=1,
     )
     #print("c19")			
     return fetch_fiscalyearslctn
+
 
 def fetch5yrsback_fiscalyear(noofyrsback,filters):
     if filters.to_date:
@@ -677,13 +746,15 @@ def fetch5yrsback_fiscalyear(noofyrsback,filters):
         end_date= date.today()
     fetch_fiscalyearslctn_1 = frappe.db.sql(
         """
-        (select year, year_start_date , year_end_date from `tabFiscal Year` 
-        where  %(Slct_date)s between year_start_date and year_end_date
-        )	
-    """,{
+        SELECT 
+            year, year_start_date, 
+            year_end_date from `tabFiscal Year` 
+        WHERE  
+            %(Slct_date)s between year_start_date AND 
+            year_end_date
+        """, {
             'Slct_date': end_date
-        },		
-        as_dict=1,
+        }, as_dict=1,
     )
     curryr = 0
     prevyrsback = 0
@@ -692,31 +763,42 @@ def fetch5yrsback_fiscalyear(noofyrsback,filters):
         curryr = ff.year						
     prevyrsback = int(curryr) - noofyrsback
 
-    fetch_fiscalyearslctn = frappe.db.sql(
+    fetch_fiscalyearslctn = frappe.db.sql (
         """
-        (select year, year_start_date , year_end_date from `tabFiscal Year` 
-        where year >= %(startyr)s and year < %(endyr)s order by year asc
-        )	
-    """,{
+        SELECT 
+            year, 
+            year_start_date, 
+            year_end_date 
+        FROM 
+            `tabFiscal Year` 
+        WHERE 
+            year >= %(startyr)s AND 
+            year < %(endyr)s 
+        ORDER BY 
+            year ASC
+        """, {
             'startyr': prevyrsback, 'endyr': curryr
-        },		
-        as_dict=1,
+        }, as_dict=1,
     )  
 
-    fetch_fiscalyearslctn_3 = frappe.db.sql(
+    fetch_fiscalyearslctn_3 = frappe.db.sql (
         """
-        (select min(year_start_date) as begindate from `tabFiscal Year` 
-        where year >= %(startyr)s and year < %(endyr)s
-        )	
-    """,{
+        SELECT 
+            min(year_start_date) as begindate 
+        FROM 
+            `tabFiscal Year` 
+        WHERE 
+            year >= %(startyr)s AND 
+            year < %(endyr)s
+        """, {
             'startyr': prevyrsback, 'endyr': curryr
-        },		
-        as_dict=1,
+        }, as_dict=1,
     )      
     for ff2 in fetch_fiscalyearslctn_3:		
         prevyrsstartdate = ff2.begindate				
     #print(prevyrsstartdate)			
     return fetch_fiscalyearslctn,prevyrsstartdate
+
 
 def getcostcenters(filters):
     cstcnt = [] # get function to fetch cost centers

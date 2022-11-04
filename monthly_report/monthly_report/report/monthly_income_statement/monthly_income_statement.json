@@ -33,7 +33,8 @@
             "fieldtype": "Select",
             "label": "Print Group",
             "mandatory": 0,
-            "wildcard_filter": 0
+            "wildcard_filter": 0,
+            "hidden": 1
         }
     ],
     "idx": 0,

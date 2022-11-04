@@ -5,18 +5,21 @@ frappe.query_reports["Monthly Income Statement"] = {
 			label: __('Company'),
 			fieldtype: 'Link',
 			options: 'Company',
-			default: frappe.defaults.get_user_default('company')
+			default: frappe.defaults.get_user_default('company'),
+			hidden: 1
 		},
 		{
 			fieldname: "from_date",
 			label: __("From Date"),
-			fieldtype: "Date"
+			fieldtype: "Date",
+			default: moment().subtract(1, 'year'),
+			reqd: 1
 		},
 		{
 			fieldname: "to_date",
 			label: __("To Date"),
 			fieldtype: "Date",
-			default: frappe.defaults.get_user_default("year_end_date"),
+			default: moment(),
 			reqd: 1
 		},
 		{
@@ -24,11 +27,13 @@ frappe.query_reports["Monthly Income Statement"] = {
 			label: __("Range"),
 			fieldtype: "Select",
 			options: [
-				{ "value": "Weekly", "label": __("Weekly") },
-				{ "value": "Monthly", "label": __("Monthly") }
+				"Weekly",
+				"Monthly",
+				"Yearly"
 			],
 			default: "Weekly",
-			reqd: 1
+			reqd: 0,
+			hidden: 1
 		},
 		{
 			fieldname: "cost_center",
@@ -45,18 +50,54 @@ frappe.query_reports["Monthly Income Statement"] = {
 			label: __("Print Group"),
 			fieldtype: "Select",
 			options: [
-				{ "value": "Weekly", "label": __("Weekly") },
-				{ "value": "Monthly", "label": __("Monthly") }
+				"30 - Trade Sales",
+				"35 - Sales Tax Commission",
+				"60 - Cost of Goods",
+				"360 - Advertising and Promotion",
+				"390 - Automotive",
+				"260 - Salaries and Wages",
+				"310 - Bad Debts",
+				"290 - Business Tax",
+				"130 - Supplies",
+				"420 - Amortization",
+				"335 - Donations",
+				"338 - Dues and Memberships",
+				"90 - Employee Benefits",
+				"370 - Travel",
+				"170 - Equipment Rentals",
+				"140 - Repairs and Maintenance",
+				"410 - Insurance",
+				"300 - Interest and Bank Charges",
+				"301 - Interest on Long Term Debt",
+				"330 - Office",
+				"320 - Professional Fees",
+				"290 - Property Taxes",
+				"295 - Rent",
+				"380 - Telephone",
+				"150 - Utilities",
+				"420 - Loss (Gain) on Disposal of Assets",
+				"500 - Income Taxes",
+				"1 - Bank",
+				"2 - Accounts Receivable",
+				"3 - Inventory",
+				"4 - Prepaids",
+				"5 - Property Plant & Equipment",
+				"6 - Goodwill",
+				"7 - Accounts Payable",
+				"8 - Income Taxes",
+				"9 - Bonus Payable",
+				"10 - Long Term Debt",
+				"11 - Due to Shareholder",
+				"12 - Share Capital",
+				"13 - Retained Earnings"
 			],
+			default: "30 - Trade Sales",
 			reqd: 1,
-			get_data: function (txt) {
-				return frappe.db.get_link_options("Print Group", txt);
-			}
+			hidden: 1
 		}
-
 	],
 	onload: function (report) {
-		report.page.add_inner_button(__("Export Report"), function () {
+		report.page.add_inner_button(__("Download Excel Spreadsheet"), function () {
 			debugger
 			let filters = report.get_values();
 
@@ -359,5 +400,3 @@ Content-Type: text/xml; charset="utf-8"
 		document.body.removeChild(link);
 	}
 })();
-
-
