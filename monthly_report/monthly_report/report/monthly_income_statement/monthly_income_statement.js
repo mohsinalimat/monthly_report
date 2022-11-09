@@ -67,15 +67,15 @@ frappe.query_reports["Monthly Income Statement"] = {
 		// 	"depends_on": "eval:doc.filter_based_on == 'Date Range'",
 		// 	hidden: true,
 		// },
-		{
-			"fieldname": "from_fiscal_year",
-			"label": __("Start Year"),
-			"fieldtype": "Link",
-			"options": "Fiscal Year",
-			"default": frappe.defaults.get_user_default("fiscal_year"),
-			"reqd": 1,
-			"depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"
-		},
+		// {
+		// 	"fieldname": "from_fiscal_year",
+		// 	"label": __("Start Year"),
+		// 	"fieldtype": "Link",
+		// 	"options": "Fiscal Year",
+		// 	"default": frappe.defaults.get_user_default("fiscal_year"),
+		// 	"reqd": 1,
+		// 	"depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"
+		// },
 		{
 			"fieldname": "to_fiscal_year",
 			"label": __("End Year"),

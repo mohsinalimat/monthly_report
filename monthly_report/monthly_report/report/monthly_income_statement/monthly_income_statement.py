@@ -6,7 +6,7 @@ from erpnext.accounts.report.financial_statements import *
 
 
 def execute(filters = None):
-    period_list = get_period_list(filters.from_fiscal_year, filters.to_fiscal_year, filters.period_start_date, filters.period_end_date, filters.filter_based_on, filters.periodicity, filters.period_end_month, company = filters.company,)
+    period_list = get_period_list(filters.to_fiscal_year, filters.period_start_date, filters.period_end_date, filters.filter_based_on, filters.periodicity, filters.period_end_month, company = filters.company,)
     income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", period_list, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True,)
     expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", period_list, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True,)
 
@@ -36,13 +36,17 @@ def get_columns(period_end_month, period_end_year, periodicity, period_list, acc
 
 ## overriden function from financial_statements.py
 # 
-def get_period_list(from_fiscal_year, to_fiscal_year, period_start_date, period_end_date, filter_based_on, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
+def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_based_on, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
     # Get a list of dict {"from_date": from_date, "to_date": to_date, "key": key, "label": label}
     # Periodicity can be (Yearly, Quarterly, Monthly)
 
+    from_fiscal_year = to_fiscal_year
+    build_start_year_and_date = (str(int(from_fiscal_year)-1) + '-01-01')
+
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
     validate_fiscal_year(fiscal_year, from_fiscal_year, to_fiscal_year)
-    year_start_date = getdate(fiscal_year.year_start_date)
+    # year_start_date = getdate(fiscal_year.year_start_date)
+    year_start_date = getdate(build_start_year_and_date)
     year_end_date = getdate(fiscal_year.year_end_date)
 
     months_to_add = {"Yearly": 12, "Half-Yearly": 6, "Quarterly": 3, "Monthly": 1}[periodicity]
