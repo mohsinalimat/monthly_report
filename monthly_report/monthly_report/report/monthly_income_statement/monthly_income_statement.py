@@ -1,6 +1,7 @@
 # Copyright (c) 2022, Farabi Hussain
 
 import frappe
+import calendar
 from frappe import _, scrub
 from erpnext.accounts.report.financial_statements import *
 
@@ -24,11 +25,14 @@ def get_columns(period_end_month, period_end_year, periodicity, period_list, acc
     columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 200,}]
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
 
-    for period in period_list:
-        columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 155,})
-        if (period.label == end_month_and_year): break
+    for period in reversed(period_list):
+        # columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 155,})
+        if (period.label[0:3] == end_month_and_year[0:3]): 
+            columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 155,})
+            # break
 
-    columns.append({"fieldname": "total", "label": _("Total"), "fieldtype": "Currency", "width": 150,})
+    ## adds the total column on the right
+    # columns.append({"fieldname": "total", "label": _("Total"), "fieldtype": "Currency", "width": 150,}) 
     # columns.append({"fieldname": "totals", "label": _("Totals"), "fieldtype": "Currency", "width": 150,})
 
     return columns
@@ -46,12 +50,19 @@ def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_b
     # by default it gets the start month of the fiscal year, which can be different from January
     # but the first column should be the same column as the selected month, which may be from before the current fiscal year
     # to circumvent this, we pick months from the beginning of the calendar year if its before the fiscal year
-    build_start_year_and_date = (str(int(from_fiscal_year)-1) + '-01-01')
 
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
     validate_fiscal_year(fiscal_year, from_fiscal_year, to_fiscal_year)
-    # year_start_date = getdate(fiscal_year.year_start_date)
-    year_start_date = getdate(build_start_year_and_date)
+
+    selected_month_in_int = list(calendar.month_abbr).index(period_end_month[0:3])
+    fiscal_starting_month_in_int = int(fiscal_year.year_start_date.strftime("%m"))
+
+    if (selected_month_in_int < fiscal_starting_month_in_int):
+        build_start_year_and_date = (str(int(from_fiscal_year)-1) + '-' + str(selected_month_in_int) + '-01')
+        year_start_date = getdate(build_start_year_and_date)
+    else:
+        year_start_date = getdate(fiscal_year.year_start_date)
+
     year_end_date = getdate(fiscal_year.year_end_date)
 
     months_to_add = {"Yearly": 12, "Half-Yearly": 6, "Quarterly": 3, "Monthly": 1}[periodicity]
