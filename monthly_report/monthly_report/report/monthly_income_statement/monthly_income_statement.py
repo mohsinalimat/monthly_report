@@ -6,8 +6,12 @@ from frappe import _, scrub
 from erpnext.accounts.report.financial_statements import *
 
 
+global_fiscal_year = 0
+
+
 def execute(filters = None):
-    period_list = get_period_list(filters.to_fiscal_year, filters.period_start_date, filters.period_end_date, filters.filter_based_on, filters.periodicity, filters.period_end_month, company = filters.company,)
+    period_list = get_period_list(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company,)
+    period_list_prev = get_period_list(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company,)
     income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", period_list, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True,)
     expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", period_list, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True,)
 
@@ -22,40 +26,38 @@ def execute(filters = None):
 ## overriden function from financial_statements.py
 # goes through the columns and appends them based on the user-selected month
 def get_columns(period_end_month, period_end_year, periodicity, period_list, accumulated_values=1, company=None):
-    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 200,}]
+    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 400,}]
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
 
     for period in reversed(period_list):
-        # columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 155,})
         if (period.label[0:3] == end_month_and_year[0:3]): 
-            columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 155,})
+            columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 250,})
             # break
 
-    ## adds the total column on the right
-    # columns.append({"fieldname": "total", "label": _("Total"), "fieldtype": "Currency", "width": 150,}) 
-    # columns.append({"fieldname": "totals", "label": _("Totals"), "fieldtype": "Currency", "width": 150,})
+    columns.append({"fieldname": "total", "label": _("YTD-" + str(period_end_year[2:4])), "fieldtype": "Currency", "width": 250,})
+    columns.append({"fieldname": "total", "label": _("YTD-" + str(int(period_end_year[2:4])-1)), "fieldtype": "Currency", "width": 250,})
 
     return columns
 
 
 ## overriden function from financial_statements.py
 # 
-def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_based_on, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
+def get_period_list(to_fiscal_year, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
     # Get a list of dict {"from_date": from_date, "to_date": to_date, "key": key, "label": label}
     # Periodicity can be (Yearly, Quarterly, Monthly)
 
-    # we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
-    from_fiscal_year = to_fiscal_year
+    from_fiscal_year = to_fiscal_year # we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
 
     # by default it gets the start month of the fiscal year, which can be different from January
     # but the first column should be the same column as the selected month, which may be from before the current fiscal year
     # to circumvent this, we pick months from the beginning of the calendar year if its before the fiscal year
-
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
-    validate_fiscal_year(fiscal_year, from_fiscal_year, to_fiscal_year)
+    global global_fiscal_year
+    global_fiscal_year = fiscal_year
 
-    selected_month_in_int = list(calendar.month_abbr).index(period_end_month[0:3])
-    fiscal_starting_month_in_int = int(fiscal_year.year_start_date.strftime("%m"))
+    validate_fiscal_year(fiscal_year, from_fiscal_year, to_fiscal_year)
+    selected_month_in_int = list(calendar.month_abbr).index(period_end_month[0:3]) # convert the selected month into int
+    fiscal_starting_month_in_int = int(fiscal_year.year_start_date.strftime("%m")) # convert the fiscal year's starting month into int
 
     if (selected_month_in_int < fiscal_starting_month_in_int):
         build_start_year_and_date = (str(int(from_fiscal_year)-1) + '-' + str(selected_month_in_int) + '-01')
@@ -63,6 +65,7 @@ def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_b
     else:
         year_start_date = getdate(fiscal_year.year_start_date)
 
+    fiscal_year_start_month = fiscal_year.year_start_date
     year_end_date = getdate(fiscal_year.year_end_date)
 
     months_to_add = {"Yearly": 12, "Half-Yearly": 6, "Quarterly": 3, "Monthly": 1}[periodicity]
@@ -120,6 +123,7 @@ def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_b
 def get_data(period_end_month, period_end_year, company, root_type, balance_must_be, period_list, filters=None, accumulated_values=1, only_current_fiscal_year=True, ignore_closing_entries=False, ignore_accumulated_values_for_fy=False, total=True,):
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
     accounts = get_accounts(company, root_type)
+    
     if not accounts:
         return None
 
@@ -162,12 +166,22 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
 
     return out
 
+
 ## overriden function from financial_statements.py
 # 
 def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency):
     data = []
     year_start_date = period_list[0]["year_start_date"].strftime("%Y-%m-%d")
     year_end_date = period_list[-1]["year_end_date"].strftime("%Y-%m-%d")
+
+    current_fiscal_year = False
+
+    global global_fiscal_year
+    fiscal_year_start_month_in_int = int(global_fiscal_year.year_start_date.strftime("%m"))
+    fiscal_year_in_int = int(global_fiscal_year.year_start_date.strftime("%Y"))
+
+    # fiscal_year_start_month_in_str = calendar.month_abbr[int(global_fiscal_year.year_start_date.strftime("%m"))] # prints 'Jul'
+    # start_month_and_year = (str(fiscal_year_start_month_in_str) + " " + str(int(end_month_and_year[4:8])-1))
 
     for d in accounts:
         # add to output
@@ -202,7 +216,17 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
             # ignore zero values
             if abs(row[period.key]) >= 0.005:
                 has_value = True
-                total += flt(row[period.key])
+
+                current_month_in_int = list(calendar.month_abbr).index(period.label[0:3])
+                current_year_in_int = int(period.label[4:8])
+
+                # adds up 
+                if (current_year_in_int >= fiscal_year_in_int):
+                    if (current_month_in_int >= fiscal_year_start_month_in_int):
+                        total += flt(row[period.key])
+                    else:
+                        if (current_year_in_int > fiscal_year_in_int):
+                            total += flt(row[period.key])
             
             if (period.label == end_month_and_year):
                 break
