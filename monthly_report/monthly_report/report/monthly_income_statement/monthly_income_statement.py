@@ -40,7 +40,12 @@ def get_period_list(to_fiscal_year, period_start_date, period_end_date, filter_b
     # Get a list of dict {"from_date": from_date, "to_date": to_date, "key": key, "label": label}
     # Periodicity can be (Yearly, Quarterly, Monthly)
 
+    # we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
     from_fiscal_year = to_fiscal_year
+
+    # by default it gets the start month of the fiscal year, which can be different from January
+    # but the first column should be the same column as the selected month, which may be from before the current fiscal year
+    # to circumvent this, we pick months from the beginning of the calendar year if its before the fiscal year
     build_start_year_and_date = (str(int(from_fiscal_year)-1) + '-01-01')
 
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
