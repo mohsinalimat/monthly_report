@@ -8,66 +8,55 @@ from erpnext.accounts.report.financial_statements import *
 
 global_fiscal_year = 0
 
-
+######################################################################################################
+## main function for the custom app
+######################################################################################################
 def execute(filters = None):
-    is_prev_year = False
-    curr_fiscal_year = str(int(filters.to_fiscal_year) - 0)
-    curr_year_period = get_period_list(curr_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
-    curr_year_income = get_data(is_prev_year, filters.period_end_month, curr_fiscal_year, filters.company, "Income", "Credit", curr_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    curr_year_expense = get_data(is_prev_year, filters.period_end_month, curr_fiscal_year, filters.company, "Expense", "Debit", curr_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    curr_year_columns = get_columns(filters.period_end_month, curr_fiscal_year, filters.periodicity, curr_year_period)
-
-    is_prev_year = True
-    prev_fiscal_year = str(int(curr_fiscal_year) - 1)
-    prev_year_period = get_period_list(prev_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
-    prev_year_income = get_data(is_prev_year, filters.period_end_month, prev_fiscal_year, filters.company, "Income", "Credit", prev_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    prev_year_expense = get_data(is_prev_year, filters.period_end_month, prev_fiscal_year, filters.company, "Expense", "Debit", prev_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    prev_year_ytd = get_ytd_column(filters.period_end_month, prev_fiscal_year, filters.periodicity, prev_year_period)
+    curr_year_period  = get_period_list(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
+    curr_year_income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", curr_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
+    curr_year_expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", curr_year_period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
+    curr_year_columns = get_columns(filters.period_end_month, filters.to_fiscal_year, filters.periodicity, curr_year_period)
 
     data = []
     data.extend(curr_year_income or [])
     data.extend(curr_year_expense or [])
     columns = curr_year_columns
 
-    data.extend(prev_year_income or [])
-    data.extend(prev_year_expense or [])
-    # columns.append(prev_year_columns)
-
     return columns, data, None, None, None
 
 
-## overriden function from financial_statements.py
-# goes through the columns and appends them based on the user-selected month
-def get_ytd_column(period_end_month, period_end_year, periodicity, period_list):
-    # columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 300}]
-    end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
-    columns = ({"fieldname": "total", "label": _("YTD " + str(period_end_year)), "fieldtype": "Currency", "width": 250})
-
-    return columns
-
-## overriden function from financial_statements.py
-# goes through the columns and appends them based on the user-selected month
+######################################################################################################
+## overriden from from financial_statements.py 
+## -- goes through the columns and appends them based on the user-selected month
+######################################################################################################
 def get_columns(period_end_month, period_end_year, periodicity, period_list):
-    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 300}]
+    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 350}]
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
+
+    fiscal_year_start_stamp = ((int(period_end_year) - 1) * 100) + int(list(calendar.month_abbr).index(period_end_month[0:3]))
 
     for period in reversed(period_list):
-        # if (period.label[0:3] == end_month_and_year[0:3]): 
-            columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 150})
+        current_timestamp = ((int(period.label[4:8])) * 100) + int(list(calendar.month_abbr).index(period.label[0:3])) # current index in timestamp
 
-    columns.append({"fieldname": "total", "label": _("YTD " + str(period_end_year)), "fieldtype": "Currency", "width": 250})
-    columns.append({"fieldname": "prev_year_total", "label": _("YTD " + str(int(period_end_year)-1)), "fieldtype": "Currency", "width": 250})
+        if (current_timestamp >= fiscal_year_start_stamp): # check the year
+            if (period.label[0:3] == end_month_and_year[0:3]): # check the month
+                columns.append({"fieldname": period.key, "label": period.label, "fieldtype": "Currency", "options": "currency", "width": 175})
+
+    columns.append({"fieldname": "total", "label": _("YTD " + str(period_end_year)), "fieldtype": "Currency", "width": 175})
+    columns.append({"fieldname": "prev_year_total", "label": _("YTD " + str(int(period_end_year)-1)), "fieldtype": "Currency", "width": 175})
 
     return columns
 
 
-## overriden function from financial_statements.py
-# 
+######################################################################################################
+## overriden from from financial_statements.py
+## -- returns the timeframe for which this report is generated
+######################################################################################################
 def get_period_list(to_fiscal_year, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
     # Get a list of dict {"from_date": from_date, "to_date": to_date, "key": key, "label": label}
     # Periodicity can be (Yearly, Quarterly, Monthly)
 
-    from_fiscal_year = str(int(to_fiscal_year))# we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
+    from_fiscal_year = str(int(to_fiscal_year) - 1)# we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
 
     # by default it gets the start month of the fiscal year, which can be different from January
     # but the first column should be the same column as the selected month, which may be from before the current fiscal year
@@ -96,8 +85,6 @@ def get_period_list(to_fiscal_year, periodicity, period_end_month, accumulated_v
     months = get_months(year_start_date, year_end_date)
 
     ######################################################################################################
-    # 
-    ######################################################################################################
     for i in range(months):
         period = frappe._dict({"from_date": start_date})
         to_date = add_months(start_date, months_to_add)
@@ -120,7 +107,6 @@ def get_period_list(to_fiscal_year, periodicity, period_end_month, accumulated_v
 
     ######################################################################################################
     # common processing
-    ######################################################################################################
     
     for opts in period_list:
         key = opts["to_date"].strftime("%b_%Y").lower()
@@ -145,9 +131,11 @@ def get_period_list(to_fiscal_year, periodicity, period_end_month, accumulated_v
     return period_list
 
 
-## overriden function from financial_statements.py
-# 
-def get_data(is_prev_year, period_end_month, period_end_year, company, root_type, balance_must_be, period_list, filters=None, accumulated_values=1, only_current_fiscal_year=True, ignore_closing_entries=False, ignore_accumulated_values_for_fy=False, total=True):
+######################################################################################################
+## overriden from from financial_statements.py
+##
+######################################################################################################
+def get_data(period_end_month, period_end_year, company, root_type, balance_must_be, period_list, filters=None, accumulated_values=1, only_current_fiscal_year=True, ignore_closing_entries=False, ignore_accumulated_values_for_fy=False, total=True):
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
     accounts = get_accounts(company, root_type)
     
@@ -161,12 +149,14 @@ def get_data(is_prev_year, period_end_month, period_end_year, company, root_type
     accounts_list = frappe.db.sql(
         """
         SELECT 
-            lft, rgt, print_group 
+            lft,
+            rgt,
+            print_group 
         FROM 
             tabAccount
         WHERE 
             root_type=%s 
-            AND ifnull(parent_account, '') = ''
+            AND IFNULL(parent_account, '') = ''
         """,
         root_type,
         as_dict=1,
@@ -184,36 +174,45 @@ def get_data(is_prev_year, period_end_month, period_end_year, company, root_type
             ignore_closing_entries=ignore_closing_entries,
         )
 
+    ## function imported from financial_statements.py   
     calculate_values(accounts_by_name, gl_entries_by_account, period_list, accumulated_values, ignore_accumulated_values_for_fy)
+    ## function imported from financial_statements.py
     accumulate_values_into_parents(accounts, accounts_by_name, period_list)
-
-    out = prepare_data(is_prev_year, end_month_and_year, accounts, balance_must_be, period_list, company_currency)
+    out = prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency)
 
     if out and total:
-        add_total_row(is_prev_year, end_month_and_year, out, root_type, balance_must_be, period_list, company_currency)
+        add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency)
 
     out = filter_out_zero_value_rows(out, parent_children_map)
 
     return out
 
 
-## overriden function from financial_statements.py
-# 
-def prepare_data(is_prev_year, end_month_and_year, accounts, balance_must_be, period_list, company_currency):
+######################################################################################################
+## overriden from financial_statements.py
+## -- calculates the dollar values to be put in each cell 
+######################################################################################################
+def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency):
+
     data = []
     year_start_date = period_list[0]["year_start_date"].strftime("%Y-%m-%d")
     year_end_date = period_list[-1]["year_end_date"].strftime("%Y-%m-%d")
 
     global global_fiscal_year
-
     fiscal_year_start_month_in_int = int(global_fiscal_year.year_start_date.strftime("%m"))
     fiscal_year_in_int = int(global_fiscal_year.year_start_date.strftime("%Y"))
+    fiscal_year_stamp = ((fiscal_year_in_int + 1) * 100) + fiscal_year_start_month_in_int
+
+    prev_fiscal_year_end_month = list(calendar.month_abbr).index(end_month_and_year[0:3])
+    prev_fiscal_year_start = ((fiscal_year_in_int) * 100) + fiscal_year_start_month_in_int
+    prev_fiscal_year_end = ((fiscal_year_in_int + 1) * 100) + prev_fiscal_year_end_month
 
     for d in accounts:
         # add to output
         has_value = False
         total = 0
         prev_year_total = 0
+        print_group = ""
         row = frappe._dict(
             {
                 "account": _(d.name),
@@ -241,38 +240,40 @@ def prepare_data(is_prev_year, end_month_and_year, accounts, balance_must_be, pe
             row[period.key] = flt(d.get(period.key, 0.0), 3)
 
             # ignore zero values
-            if abs(row[period.key]) >= 0.005:
+            if abs(row[period.key]) >= 0.000:
                 has_value = True
 
-                current_month_in_int = list(calendar.month_abbr).index(period.label[0:3])
-                current_year_in_int = int(period.label[4:8])
+                current_month_in_int = list(calendar.month_abbr).index(period.label[0:3]) # convert month name to month number
+                current_year_in_int = int(period.label[4:8])                              # period.label contains the date and time
+                current_year_stamp = (current_year_in_int * 100) + current_month_in_int   # creates a timestamp in the format yyyymm for date comparison
 
-                # adds up 
-                if (current_year_in_int >= fiscal_year_in_int):
-                    if (current_month_in_int >= fiscal_year_start_month_in_int):
-                        total += flt(row[period.key])
-                    else:
-                        if (current_year_in_int > fiscal_year_in_int):
-                            total += flt(row[period.key])
+                if (current_year_stamp >= fiscal_year_stamp):
+                    total += flt(row[period.key])
+
+                if (prev_fiscal_year_start <= current_year_stamp and current_year_stamp <= prev_fiscal_year_end):
+                    prev_year_total += flt(row[period.key])
             
             if (period.label == end_month_and_year):
                 break
 
         row["has_value"] = has_value
-
-        if (not is_prev_year):
-            row["total"] = total
+        row["total"] = total
+    
+        # remove value from the "Income" and "Expenses" rows
+        if (d.name[:3] == "Inc" or d.name[:3] == "Exp"):
+            row["prev_year_total"] = ""
         else:
-            row["prev_year_total"] = total
+            row["prev_year_total"] = prev_year_total
 
         data.append(row)
 
     return data
 
 
-## overriden function from financial_statements.py
-#
-def add_total_row(is_prev_year, end_month_and_year, out, root_type, balance_must_be, period_list, company_currency):
+######################################################################################################
+## overriden from financial_statements.py
+######################################################################################################
+def add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency):
     total_row = {
         "account_name": _("Total {0} ({1})").format(_(root_type), _(balance_must_be)),
         "account": _("Total {0} ({1})").format(_(root_type), _(balance_must_be)),
@@ -280,36 +281,139 @@ def add_total_row(is_prev_year, end_month_and_year, out, root_type, balance_must
         "opening_balance": 0.0,
     }
 
-    if (not is_prev_year):
-        for row in out:
-            if not row.get("parent_account"):
-                for period in period_list:
-                    total_row.setdefault(period.key, 0.0)
-                    total_row[period.key] += row.get(period.key, 0.0)
-                    row[period.key] = row.get(period.key, 0.0)
+    for row in out:
+        if not row.get("parent_account"):
+            for period in period_list:
+                total_row.setdefault(period.key, 0.0)
+                total_row[period.key] += row.get(period.key, 0.0)
+                row[period.key] = row.get(period.key, 0.0)
 
-                total_row.setdefault("total", 0.0)
-                total_row["total"] += flt(row["total"])
-                total_row["opening_balance"] += row["opening_balance"]
-                row["total"] = ""
+            total_row.setdefault("total", 0.0)
+            total_row["total"] += flt(row["total"])
+            total_row["opening_balance"] += row["opening_balance"]
+            row["total"] = ""
 
-        if "total" in total_row:
-            out.append(total_row)
-            out.append({}) # blank row after Total
+    if "total" in total_row:
+        out.append(total_row)
+        out.append({}) # blank row after Total
 
-    else:
-        for row in out:
-            if not row.get("parent_account"):
-                for period in period_list:
-                    total_row.setdefault(period.key, 0.0)
-                    total_row[period.key] += row.get(period.key, 0.0)
-                    row[period.key] = row.get(period.key, 0.0)
 
-                total_row.setdefault("prev_year_total", 0.0)
-                total_row["prev_year_total"] += flt(row["prev_year_total"])
-                total_row["opening_balance"] += row["opening_balance"]
-                row["prev_year_total"] = ""
+######################################################################################################
+##
+######################################################################################################
+def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, filters, gl_entries_by_account, ignore_closing_entries=False):
+    additional_conditions = get_additional_conditions(from_date, ignore_closing_entries, filters)
 
-        if "prev_year_total" in total_row:
-            out.append(total_row)
-            out.append({}) # blank row after Total
+    accounts = frappe.db.sql_list(
+        """
+        SELECT 
+            name,
+            print_group 
+        FROM 
+            `tabAccount`
+        WHERE 
+            lft >= %s
+            AND rgt <= %s
+            AND company = %s
+        """,
+        (root_lft, root_rgt, company, ),
+    )
+    # Returns a dict like { "account": [gl entries], ... }
+
+    if accounts:
+        additional_conditions += " AND account IN ({})".format(
+            ", ".join(frappe.db.escape(d) for d in accounts)
+        )
+
+        gl_filters = {
+            "company": company,
+            "from_date": from_date,
+            "to_date": to_date,
+            "finance_book": cstr(filters.get("finance_book")),
+        }
+
+        if filters.get("include_default_book_entries"):
+            gl_filters["company_fb"] = frappe.db.get_value("Company", company, "default_finance_book")
+
+        for key, value in filters.items():
+            if value:
+                gl_filters.update({key: value})
+
+        distributed_cost_center_query = ""
+
+        if filters and filters.get("cost_center"):
+            distributed_cost_center_query = (
+                """
+                UNION ALL
+                SELECT 
+                    posting_date,
+                    account,
+                    debit*(DCC_allocation.percentage_allocation/100) AS debit,
+                    credit*(DCC_allocation.percentage_allocation/100) AS credit,
+                    is_opening,
+                    fiscal_year,
+                    debit_in_account_currency*(DCC_allocation.percentage_allocation/100) AS debit_in_account_currency,
+                    credit_in_account_currency*(DCC_allocation.percentage_allocation/100) AS credit_in_account_currency,
+                    account_currency
+                FROM 
+                    `tabGL Entry`,
+                    (
+                        SELECT 
+                            parent, 
+                            sum(percentage_allocation) AS percentage_allocation
+                        FROM 
+                            `tabDistributed Cost Center`
+                        WHERE 
+                            cost_center IN %(cost_center)s
+                            AND parent NOT IN %(cost_center)s
+                        GROUP BY 
+                            parent
+                    ) AS DCC_allocation
+                WHERE 
+                    company=%(company)s
+                    {additional_conditions}
+                    AND posting_date <= %(to_date)s
+                    AND is_cancelled = 0
+                    AND cost_center = DCC_allocation.parent
+                """.format(
+                    additional_conditions = additional_conditions.replace("AND cost_center IN %(cost_center)s ", "")
+                )
+            )
+
+        gl_entries = frappe.db.sql(
+            """
+            SELECT 
+                posting_date,
+                account,
+                debit,
+                credit,
+                is_opening,
+                fiscal_year,
+                debit_in_account_currency,
+                credit_in_account_currency,
+                account_currency 
+            FROM 
+                `tabGL Entry`
+            WHERE 
+                company=%(company)s
+                {additional_conditions}
+                AND posting_date <= %(to_date)s
+                AND is_cancelled = 0
+                {distributed_cost_center_query}
+            """.format(
+                additional_conditions=additional_conditions,
+                distributed_cost_center_query=distributed_cost_center_query,
+            ),
+            gl_filters,
+            as_dict=True,
+        )  # nosec
+
+        if filters and filters.get("presentation_currency"):
+            convert_to_presentation_currency(gl_entries, get_currency(filters), filters.get("company"))
+
+        for entry in gl_entries:
+            gl_entries_by_account.setdefault(entry.account, []).append(entry)
+
+        return gl_entries_by_account
+
+
