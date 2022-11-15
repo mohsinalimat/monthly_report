@@ -5,8 +5,63 @@ import calendar
 from frappe import _, scrub
 from erpnext.accounts.report.financial_statements import *
 
-
 global_fiscal_year = 0
+
+counter_dict = {
+    "1 - Bank" : 0,
+    "2 - Accounts Receivable" : 0,
+    "3 - Inventory" : 0,
+    "4 - Prepaids" : 0,
+    "5 - Property Plant & Equipment" : 0,
+    "6 - Goodwill" : 0,
+    "7 - Accounts Payable" : 0,
+    "8 - Income Taxes" : 0,
+    "9 - Bonus Payable" : 0,
+    "10 - Long Term Debt" : 0,
+    "11 - Due to Shareholder" : 0,
+    "12 - Share Capital" : 0,
+    "13 - Retained Earnings" : 0,
+    "30 - Trade Sales" : 0,
+    "35 - Sales Tax Commission" : 0,
+    "60 - Cost of Goods" : 0,
+    "90 - Employee Benefits" : 0,
+    "360 - Advertising and Promotion" : 0,
+    "390 - Automotive" : 0,
+    "260 - Salaries and Wages" : 0,
+    "310 - Bad Debts" : 0,
+    "290 - Business Tax" : 0,
+    "130 - Supplies" : 0,
+    "420 - Amortization" : 0,
+    "335 - Donations" : 0,
+    "338 - Dues and Memberships" : 0,
+    "370 - Travel" : 0,
+    "170 - Equipment Rentals" : 0,
+    "140 - Repairs and Maintenance" : 0,
+    "410 - Insurance" : 0,
+    "300 - Interest and Bank Charges" : 0,
+    "301 - Interest on Long Term Debt" : 0,
+    "330 - Office" : 0,
+    "320 - Professional Fees" : 0,
+    "290 - Property Taxes" : 0,
+    "295 - Rent" : 0,
+    "380 - Telephone" : 0,
+    "150 - Utilities" : 0,
+    "420 - Loss (Gain) on Disposal of Assets" : 0,
+    "500 - Income Taxes" : 0,
+    "600 - Assets" : 0,
+    "601 - Current Assets" : 0,
+    "602 - Fixed Asset" : 0,
+    "603 - Equity" : 0,
+    "604 - Expenses" : 0,
+    "605 - Income" : 0,
+    "606 - Other Income" : 0,
+    "607 - Liabilities" : 0,
+    "608 - Bank Indebtedness" : 0,
+    "609 - Current Liabilities" : 0,
+    "610 - Duties and Taxes" : 0,
+    "611 - Long-Term Liabilities" : 0,
+}
+
 
 ######################################################################################################
 ## main function for the custom app
@@ -146,6 +201,8 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
     company_currency = get_appropriate_currency(company, filters)
     gl_entries_by_account = {}
 
+    # extracts the root of the trees "Income" and "Expenses"
+    # only two elements in this dict
     accounts_list = frappe.db.sql(
         """
         SELECT 
@@ -159,9 +216,10 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
             AND IFNULL(parent_account, '') = ''
         """,
         root_type,
-        as_dict=1,
+        as_dict = True,
     )
 
+    # for both of the trees, extract the leaves and populate gl_entries_by_account
     for root in accounts_list:
         set_gl_entries_by_account(
             company,
@@ -174,16 +232,20 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
             ignore_closing_entries=ignore_closing_entries,
         )
 
-    ## function imported from financial_statements.py   
-    calculate_values(accounts_by_name, gl_entries_by_account, period_list, accumulated_values, ignore_accumulated_values_for_fy)
-    ## function imported from financial_statements.py
-    accumulate_values_into_parents(accounts, accounts_by_name, period_list)
+    # for entry in gl_entries_by_account:
+        # print(entry + " " + str(print_group_name))
+        # entry.append(print_group_name[0].print_group)
+
+    calculate_values(accounts_by_name, gl_entries_by_account, period_list, accumulated_values, ignore_accumulated_values_for_fy) ## function imported from financial_statements.py
+    accumulate_values_into_parents(accounts, accounts_by_name, period_list)                                                      ## function imported from financial_statements.py
     out = prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency)
 
     if out and total:
         add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency)
 
     out = filter_out_zero_value_rows(out, parent_children_map)
+
+    # print('\n'.join('{}: {}'.format(*k) for k in enumerate(out)))
 
     return out
 
@@ -207,40 +269,53 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
     prev_fiscal_year_start = ((fiscal_year_in_int) * 100) + fiscal_year_start_month_in_int
     prev_fiscal_year_end = ((fiscal_year_in_int + 1) * 100) + prev_fiscal_year_end_month
 
-    for d in accounts:
+    for account in accounts:
         # add to output
         has_value = False
         total = 0
         prev_year_total = 0
-        print_group = ""
+
+        print_group_name = frappe.db.sql(
+            """
+            SELECT
+                print_group
+            FROM
+                tabAccount
+            WHERE
+                name = %s
+            """,
+            account.name
+        )
+
         row = frappe._dict(
             {
-                "account": _(d.name),
-                "parent_account": _(d.parent_account) if d.parent_account else "",
-                "indent": flt(d.indent),
+                "account": _(account.name),
+                "parent_account": _(account.parent_account) if account.parent_account else "",
+                "indent": flt(account.indent),
                 "year_start_date": year_start_date,
                 "year_end_date": year_end_date,
                 "currency": company_currency,
-                "include_in_gross": d.include_in_gross,
-                "account_type": d.account_type,
-                "is_group": d.is_group,
-                "opening_balance": d.get("opening_balance", 0.0) * (1 if balance_must_be == "Debit" else -1),
+                "include_in_gross": account.include_in_gross,
+                "account_type": account.account_type,
+                "is_group": account.is_group,
+                "opening_balance": account.get("opening_balance", 0.0) * (1 if balance_must_be == "Debit" else -1),
                 "account_name": (
-                    "%s - %s" % (_(d.account_number), _(d.account_name))
-                    if d.account_number
-                    else _(d.account_name)
+                    "%s - %s" % (_(account.account_number), _(account.account_name))
+                    if account.account_number
+                    else _(account.account_name)
                 ),
             }
         )
 
-        for period in period_list:
-            if d.get(period.key) and balance_must_be == "Credit":
-                d[period.key] *= -1 # change sign based on Debit or Credit, since calculation is done using (debit - credit)
 
-            row[period.key] = flt(d.get(period.key, 0.0), 3)
+        for period in period_list:
+            if account.get(period.key) and balance_must_be == "Credit":
+                account[period.key] *= -1 # change sign based on Debit or Credit, since calculation is done using (debit - credit)
+
+            row[period.key] = flt(account.get(period.key, 0.0), 3)
 
             # ignore zero values
-            if abs(row[period.key]) >= 0.000:
+            if abs(row[period.key]) >= 0.005:
                 has_value = True
 
                 current_month_in_int = list(calendar.month_abbr).index(period.label[0:3]) # convert month name to month number
@@ -258,14 +333,21 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
 
         row["has_value"] = has_value
         row["total"] = total
+        # row["account"] = print_group_name[0][0]
+        row["print_group"] = print_group_name[0][0]
     
         # remove value from the "Income" and "Expenses" rows
-        if (d.name[:3] == "Inc" or d.name[:3] == "Exp"):
+        if (account.name[:3] == "Inc" or account.name[:3] == "Exp"):
             row["prev_year_total"] = ""
         else:
             row["prev_year_total"] = prev_year_total
 
+
+        # if (row["is_group"] != True):
         data.append(row)
+        # else:
+        print(row)
+
 
     return data
 
@@ -302,13 +384,14 @@ def add_total_row(end_month_and_year, out, root_type, balance_must_be, period_li
 ##
 ######################################################################################################
 def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, filters, gl_entries_by_account, ignore_closing_entries=False):
+    # Returns a dict like { "account": [gl entries], ... }
     additional_conditions = get_additional_conditions(from_date, ignore_closing_entries, filters)
+    global counter_dict
 
     accounts = frappe.db.sql_list(
         """
-        SELECT 
-            name,
-            print_group 
+        SELECT
+            name
         FROM 
             `tabAccount`
         WHERE 
@@ -316,13 +399,12 @@ def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, f
             AND rgt <= %s
             AND company = %s
         """,
-        (root_lft, root_rgt, company, ),
+        (root_lft, root_rgt, company)
     )
-    # Returns a dict like { "account": [gl entries], ... }
 
     if accounts:
         additional_conditions += " AND account IN ({})".format(
-            ", ".join(frappe.db.escape(d) for d in accounts)
+            ", ".join(frappe.db.escape(account) for account in accounts)
         )
 
         gl_filters = {
@@ -405,15 +487,11 @@ def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, f
                 distributed_cost_center_query=distributed_cost_center_query,
             ),
             gl_filters,
-            as_dict=True,
-        )  # nosec
+            as_dict = True,
+        )
 
         if filters and filters.get("presentation_currency"):
             convert_to_presentation_currency(gl_entries, get_currency(filters), filters.get("company"))
 
         for entry in gl_entries:
             gl_entries_by_account.setdefault(entry.account, []).append(entry)
-
-        return gl_entries_by_account
-
-
