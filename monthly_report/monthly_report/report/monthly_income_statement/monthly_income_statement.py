@@ -6,62 +6,8 @@ from frappe import _, scrub
 from erpnext.accounts.report.financial_statements import *
 
 global_fiscal_year = 0
-
-counter_dict = {
-    "1 - Bank" : 0,
-    "2 - Accounts Receivable" : 0,
-    "3 - Inventory" : 0,
-    "4 - Prepaids" : 0,
-    "5 - Property Plant & Equipment" : 0,
-    "6 - Goodwill" : 0,
-    "7 - Accounts Payable" : 0,
-    "8 - Income Taxes" : 0,
-    "9 - Bonus Payable" : 0,
-    "10 - Long Term Debt" : 0,
-    "11 - Due to Shareholder" : 0,
-    "12 - Share Capital" : 0,
-    "13 - Retained Earnings" : 0,
-    "30 - Trade Sales" : 0,
-    "35 - Sales Tax Commission" : 0,
-    "60 - Cost of Goods" : 0,
-    "90 - Employee Benefits" : 0,
-    "360 - Advertising and Promotion" : 0,
-    "390 - Automotive" : 0,
-    "260 - Salaries and Wages" : 0,
-    "310 - Bad Debts" : 0,
-    "290 - Business Tax" : 0,
-    "130 - Supplies" : 0,
-    "420 - Amortization" : 0,
-    "335 - Donations" : 0,
-    "338 - Dues and Memberships" : 0,
-    "370 - Travel" : 0,
-    "170 - Equipment Rentals" : 0,
-    "140 - Repairs and Maintenance" : 0,
-    "410 - Insurance" : 0,
-    "300 - Interest and Bank Charges" : 0,
-    "301 - Interest on Long Term Debt" : 0,
-    "330 - Office" : 0,
-    "320 - Professional Fees" : 0,
-    "290 - Property Taxes" : 0,
-    "295 - Rent" : 0,
-    "380 - Telephone" : 0,
-    "150 - Utilities" : 0,
-    "420 - Loss (Gain) on Disposal of Assets" : 0,
-    "500 - Income Taxes" : 0,
-    "600 - Assets" : 0,
-    "601 - Current Assets" : 0,
-    "602 - Fixed Asset" : 0,
-    "603 - Equity" : 0,
-    "604 - Expenses" : 0,
-    "605 - Income" : 0,
-    "606 - Other Income" : 0,
-    "607 - Liabilities" : 0,
-    "608 - Bank Indebtedness" : 0,
-    "609 - Current Liabilities" : 0,
-    "610 - Duties and Taxes" : 0,
-    "611 - Long-Term Liabilities" : 0,
-}
-
+curr_year = ""
+prev_year = ""
 
 ######################################################################################################
 ## main function for the custom app
@@ -85,7 +31,7 @@ def execute(filters = None):
 ## -- goes through the columns and appends them based on the user-selected month
 ######################################################################################################
 def get_columns(period_end_month, period_end_year, periodicity, period_list):
-    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 350}]
+    columns = [{"fieldname": "account", "label": _("Account"), "fieldtype": "Link", "options": "Account", "width": 325}]
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
 
     fiscal_year_start_stamp = ((int(period_end_year) - 1) * 100) + int(list(calendar.month_abbr).index(period_end_month[0:3]))
@@ -207,8 +153,7 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
         """
         SELECT 
             lft,
-            rgt,
-            print_group 
+            rgt 
         FROM 
             tabAccount
         WHERE 
@@ -216,34 +161,33 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
             AND IFNULL(parent_account, '') = ''
         """,
         root_type,
-        as_dict = True,
+        as_dict = True
     )
 
     # for both of the trees, extract the leaves and populate gl_entries_by_account
     for root in accounts_list:
-        set_gl_entries_by_account(
-            company,
-            period_list[0]["year_start_date"] if only_current_fiscal_year else None,
-            period_list[-1]["to_date"],
-            root.lft,
-            root.rgt,
-            filters,
-            gl_entries_by_account,
-            ignore_closing_entries=ignore_closing_entries,
-        )
-
-    # for entry in gl_entries_by_account:
-        # print(entry + " " + str(print_group_name))
-        # entry.append(print_group_name[0].print_group)
+        set_gl_entries_by_account(company, period_list[0]["year_start_date"] if only_current_fiscal_year else None, period_list[-1]["to_date"], root.lft, root.rgt, filters, gl_entries_by_account, ignore_closing_entries=ignore_closing_entries)
 
     calculate_values(accounts_by_name, gl_entries_by_account, period_list, accumulated_values, ignore_accumulated_values_for_fy) ## function imported from financial_statements.py
     accumulate_values_into_parents(accounts, accounts_by_name, period_list)                                                      ## function imported from financial_statements.py
     out = prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency)
 
-    if out and total:
-        add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency)
+    # if out and total:
+        # add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency)
 
+    out.append({}) # blank row after Total
     out = filter_out_zero_value_rows(out, parent_children_map)
+
+    for data in out:
+        if data: 
+            if data.account[-5:] == " - WW":
+                data.account = (data.account)[:-5]
+            if data.account == "Other Income":
+                data.account = "Sales"
+            if data.account == "Income" or data.account == "Expenses":
+                global curr_year, prev_year
+                data.account = data.total = data.prev_year_total = data[curr_year] = data[prev_year] = ""
+
 
     # print('\n'.join('{}: {}'.format(*k) for k in enumerate(out)))
 
@@ -252,7 +196,7 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
 
 ######################################################################################################
 ## overriden from financial_statements.py
-## -- calculates the dollar values to be put in each cell 
+## -- calculates the dollar values to be put in each cell, one row at a time 
 ######################################################################################################
 def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency):
 
@@ -260,32 +204,22 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
     year_start_date = period_list[0]["year_start_date"].strftime("%Y-%m-%d")
     year_end_date = period_list[-1]["year_end_date"].strftime("%Y-%m-%d")
 
+    # variables for current fiscal year calculation
     global global_fiscal_year
     fiscal_year_start_month_in_int = int(global_fiscal_year.year_start_date.strftime("%m"))
     fiscal_year_in_int = int(global_fiscal_year.year_start_date.strftime("%Y"))
     fiscal_year_stamp = ((fiscal_year_in_int + 1) * 100) + fiscal_year_start_month_in_int
 
+    # variables for previous fiscal year calculation
     prev_fiscal_year_end_month = list(calendar.month_abbr).index(end_month_and_year[0:3])
     prev_fiscal_year_start = ((fiscal_year_in_int) * 100) + fiscal_year_start_month_in_int
     prev_fiscal_year_end = ((fiscal_year_in_int + 1) * 100) + prev_fiscal_year_end_month
 
     for account in accounts:
-        # add to output
         has_value = False
         total = 0
         prev_year_total = 0
-
-        print_group_name = frappe.db.sql(
-            """
-            SELECT
-                print_group
-            FROM
-                tabAccount
-            WHERE
-                name = %s
-            """,
-            account.name
-        )
+        print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", account.name)
 
         row = frappe._dict(
             {
@@ -306,7 +240,6 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
                 ),
             }
         )
-
 
         for period in period_list:
             if account.get(period.key) and balance_must_be == "Credit":
@@ -331,53 +264,54 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
             if (period.label == end_month_and_year):
                 break
 
+        found_cogs = False
+
         row["has_value"] = has_value
         row["total"] = total
-        # row["account"] = print_group_name[0][0]
-        row["print_group"] = print_group_name[0][0]
-    
-        # remove value from the "Income" and "Expenses" rows
-        if (account.name[:3] == "Inc" or account.name[:3] == "Exp"):
-            row["prev_year_total"] = ""
-        else:
-            row["prev_year_total"] = prev_year_total
+        row["print_group"] = print_group[0][0]
+        row["prev_year_total"] = prev_year_total
+        row["indent"] -= 1
 
+        if (row["account"] == "Cost of Goods Sold - WW"):
+            found_cogs = True
 
-        # if (row["is_group"] != True):
+        if (row["is_group"] != True): 
+            row["account"] = print_group[0][0]
+
         data.append(row)
-        # else:
-        print(row)
 
+        if found_cogs:
+            # data.append({})
+            found_cogs = False
 
-    return data
+    
+    # this portion combines the print groups into one row with the values summed together
+    final_data = []
+    found_print_group = False # flag to assist with appending
 
+    global curr_year, prev_year
+    curr_year = str((end_month_and_year[0:3]).lower() + "_" + str(end_month_and_year[4:8]))
+    prev_year = str((end_month_and_year[0:3]).lower() + "_" + str(int(end_month_and_year[4:8])-1))
 
-######################################################################################################
-## overriden from financial_statements.py
-######################################################################################################
-def add_total_row(end_month_and_year, out, root_type, balance_must_be, period_list, company_currency):
-    total_row = {
-        "account_name": _("Total {0} ({1})").format(_(root_type), _(balance_must_be)),
-        "account": _("Total {0} ({1})").format(_(root_type), _(balance_must_be)),
-        "currency": company_currency,
-        "opening_balance": 0.0,
-    }
+    for d in data: # loop through all rows
+        found_print_group = False
 
-    for row in out:
-        if not row.get("parent_account"):
-            for period in period_list:
-                total_row.setdefault(period.key, 0.0)
-                total_row[period.key] += row.get(period.key, 0.0)
-                row[period.key] = row.get(period.key, 0.0)
+        for fd in final_data: # loop through the list we want to return
+            if (d["account"]):
+                if fd.print_group == d.print_group: # if the current row has been appeneded alread, add the value to the cumulative total
+                    found_print_group = True
+                    fd[curr_year] += d[curr_year]
+                    fd[prev_year] += d[prev_year]
+                    fd["total"] += d["total"]
+                    fd["prev_year_total"] += d["prev_year_total"]
+                    break # break the current loop since the print group has been found
 
-            total_row.setdefault("total", 0.0)
-            total_row["total"] += flt(row["total"])
-            total_row["opening_balance"] += row["opening_balance"]
-            row["total"] = ""
+        if not found_print_group:       # if the print group wasn't found in the previous for loop, it means it doesn't exist in final_data
+            # if not d["account"] == "Income - WW" and not d["account"] == "Expenses - WW":
+            final_data.append(d)        # thus, it needs to be appended
+            found_print_group = False   # reset the flag for next print group
 
-    if "total" in total_row:
-        out.append(total_row)
-        out.append({}) # blank row after Total
+    return final_data
 
 
 ######################################################################################################
@@ -386,7 +320,6 @@ def add_total_row(end_month_and_year, out, root_type, balance_must_be, period_li
 def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, filters, gl_entries_by_account, ignore_closing_entries=False):
     # Returns a dict like { "account": [gl entries], ... }
     additional_conditions = get_additional_conditions(from_date, ignore_closing_entries, filters)
-    global counter_dict
 
     accounts = frappe.db.sql_list(
         """
