@@ -21,17 +21,23 @@ prev_year = ""
 
 ## main function for the custom app
 def execute(filters = None):
-    # period  = get_period(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
-    # income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    # expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    # columns = get_columns(filters.period_end_month, filters.to_fiscal_year, filters.periodicity, period)
+    make_chart = False
 
-    # data = []
-    # data.extend(income or [])
-    # data.extend(expense or [])
+    if make_chart:
+        period  = get_period(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
+        income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
+        expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
+        columns = get_columns(filters.period_end_month, filters.to_fiscal_year, filters.periodicity, period)
 
-    # return columns, data, None, None, None
-    return None, None, None, None, None
+        data = []
+        data.extend(income or [])
+        data.extend(expense or [])
+
+        return columns, data, None, None, None
+    else:
+        return None, None, None, None, None
+
+
 
 ## overriden from financial_statements.py -- goes through the columns and appends them based on the user-selected month
 def get_columns(period_end_month, period_end_year, periodicity, period_list):
@@ -51,6 +57,8 @@ def get_columns(period_end_month, period_end_year, periodicity, period_list):
     columns.append({"fieldname": "prev_year_total", "label": _("YTD " + str(int(period_end_year)-1)), "fieldtype": "Currency", "width": 175})
 
     return columns
+
+
 
 ## overriden from financial_statements.py -- returns the timeframe for which this report is generated
 def get_period(to_fiscal_year, periodicity, period_end_month, accumulated_values=False, company=None, reset_period_on_fy_change=True, ignore_fiscal_year=False):
@@ -131,6 +139,8 @@ def get_period(to_fiscal_year, periodicity, period_end_month, accumulated_values
 
     return period_list
 
+
+
 ## overriden from financial_statements.py
 def get_data(period_end_month, period_end_year, company, root_type, balance_must_be, period_list, filters=None, accumulated_values=1, only_current_fiscal_year=True, ignore_closing_entries=False, ignore_accumulated_values_for_fy=False, total=True):
     end_month_and_year = (period_end_month[0:3] + " " + period_end_year)
@@ -178,6 +188,8 @@ def get_data(period_end_month, period_end_year, company, root_type, balance_must
                 data.parent_account = (data.parent_account)[:-5]
 
     return out
+
+
 
 ## overriden from financial_statements.py -- calculates the dollar values to be put in each cell, one row at a time 
 def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, company_currency):
@@ -251,49 +263,21 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
         if (row["is_group"] == False): 
             row["account"] = print_group[0][0]
 
+        if (row["account"] == ""):
+            row["account"] = row["account_name"]
+
         row["has_value"] = has_value
         row["total"] = total
         row["print_group"] = print_group[0][0]
         row["prev_year_total"] = prev_year_total
-        linebreak = "linebreak"
-
-        # if row["is_group"]: 
-        #     temp = row["account"]
-        #     row["account"] = linebreak
-        #     data.append(row)
-        #     row["account"] = temp
 
         data.append(row)
         current += 1
         if ((current/counter * 100) % 5 < 0.25): print("\tpreparing data " + str(int(current/counter * 100)) + "%")
 
-    # this portion combines the print groups into one row with the values summed together
-    # final_data = []
-    # found_print_group = False # flag to assist with appending
-
-    # global curr_year, prev_year
-    # curr_year = str((end_month_and_year[0:3]).lower() + "_" + str(end_month_and_year[4:8]))
-    # prev_year = str((end_month_and_year[0:3]).lower() + "_" + str(int(end_month_and_year[4:8])-1))
-
-    # for d in data: # loop through all rows
-    
-    #     found_print_group = False
-
-    #     for fd in final_data: # loop through the list we want to return
-    #         if (d["account"]):
-    #             if fd.print_group == d.print_group: # if the current row has been appeneded alread, add the value to the cumulative total
-    #                 found_print_group = True
-    #                 fd[curr_year] += d[curr_year]
-    #                 fd[prev_year] += d[prev_year]
-    #                 fd["total"] += d["total"]
-    #                 fd["prev_year_total"] += d["prev_year_total"]
-    #                 break # break the current loop since the print group has been found
-
-    #     if not found_print_group:       # if the print group wasn't found in the previous for loop, it means it doesn't exist in final_data
-    #         final_data.append(d)        # thus, it needs to be appended
-    #         found_print_group = False   # reset the flag for next print group
-
     return data
+
+
 
 ## overriden from financial_statements.py -- 
 def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, filters, gl_entries_by_account, ignore_closing_entries=False):
@@ -408,8 +392,10 @@ def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, f
         for entry in gl_entries:
             gl_entries_by_account.setdefault(entry.account, []).append(entry)
 
+
+
 ## ======================================================================
-## FUNCTION WIRKING WITH JAVASCRIPT
+## FUNCTION WORKING WITH JAVASCRIPT
 ## ======================================================================
 
 @frappe.whitelist()
@@ -439,6 +425,8 @@ def get_records(report_name, filters):
         return [], [], None, []
     
     return columns, data
+
+
 
 ## validates the filters for the get_records() function
 def validate_filters(filters):

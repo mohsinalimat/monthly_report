@@ -37,9 +37,40 @@ frappe.query_reports["Monthly Income Statement"] = {
 	},
 }
 
-// ======================================================================
+// ============================================================================================================================================
+// INTRO
+// ============================================================================================================================================
+/* 
+	To whoever is reading this, if this is the first time you are looking at this code, press Ctrl+K+0 to collapse everything on VS Code.
+	It'll give you an outline of the functions I wrote and, in effect, a better understanding of the flow of the code. 
+
+	The functions are written in order of appearance to the best of my ability. Begin at generate_table() and move along downwards. 
+
+	To summarize, 
+		-> the generator functions are the ones that generate the html that gets exported to excel.
+		-> the getter functions are supporting functions that get you the thing it says in its name.
+		-> the append functions are used to append one row or section of html based on the data passed to it.
+		-> tables_to_excel() is some sort of legacy code that I did not write, and is difficult to read. 
+			I've left it mostly untouched, but it does what it describes -- converts the tables to excel.
+		-> the global flags are essentially shorcuts to avoid commenting out stuff when I needed to test things.
+
+	Everything is made to be modular, as best as I could. Moving things around a bit should still allow things to work.
+
+	Hope this helps.
+
+	- Farabi Hussain
+*/ 
+
+// ============================================================================================================================================
+// GLOBAL FLAGS
+// ============================================================================================================================================
+
+var minus_to_brackets = false; // flag that determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
+var download_excel = true;     // flag that determines if the excel spreadsheet is to be downloaded at the end of processing
+
+// ============================================================================================================================================
 // GENERATOR FUNCTIONS
-// ======================================================================
+// ============================================================================================================================================
 
 function generate_table(message, company, month, year) {
 	// tbh i dont know what these are, just that things break without them 
@@ -54,15 +85,15 @@ function generate_table(message, company, month, year) {
 	var prev_month_year = month_name + "_" + (parseInt(year) - 1).toString();
 
 	// css for the table 
-	table_css  = generate_table_css();
+	table_css = generate_table_css();
 	
 	// the table containing all the data in html format
 	table_html += '<div id="data">';
-	table_html += '    <table style="font-weight: normal; font-family: Calibri; font-size: 10pt;" id=' + $export_id + '>';
+	table_html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $export_id + '>';
 	table_html += generate_table_caption(company, month, year)
 	table_html += generate_table_head(month, year)
 	table_html += generate_table_body(message, curr_month_year, prev_month_year)
-	table_html += '    </table>';
+	table_html += '</table>';
 	table_html += '</div>';
 
 	// append the css & html, then export as xls
@@ -70,26 +101,8 @@ function generate_table(message, company, month, year) {
 	$(".report-wrapper").append(table_css);
 	$(".report-wrapper").append(table_html);
 
-	tables_to_excel(table_count, curr_month_year +'.xls');
-}
-
-function generate_table_body(message, curr_month_year, prev_month_year) {
-	var html = ""; // holds the html that is returned
-
-	html += '<tbody>'; // start html table body
-	html += append_group_row("Income")
-	html += get_category_rows("Product Sales", message, curr_month_year, prev_month_year);
-	html += get_category_rows("Other Income", message, curr_month_year, prev_month_year);
-
-	html += append_group_row("Cost of Goods Sold")
-	html += get_category_rows("Cost of Goods Sold", message, curr_month_year, prev_month_year);
-	
-	html += append_group_row("Expenses")
-	html += get_category_rows("Operating Expenses", message, curr_month_year, prev_month_year);
-	html += get_category_rows("Other Expenses", message, curr_month_year, prev_month_year);
-	html += '</tbody>'; // end html table body
-
-	return html;
+	if (download_excel)
+		tables_to_excel(table_count, curr_month_year +'.xls');
 }
 
 function generate_table_css() {
@@ -108,7 +121,7 @@ function generate_table_caption(company, month, year) {
 
 	table_caption += '<caption style="text-align: left;">';
 	table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + company + '</br></span>';
-	table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + month + ' 31, ' + year + '</span>';
+	table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + month + '&nbsp;31,&nbsp;' + year + '</span>';
 	table_caption += '</caption>';
 
 	return table_caption;
@@ -119,66 +132,171 @@ function generate_table_head(month, year) {
 
 	table_head += '<thead>';
 	table_head += '    <tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
-	table_head += '        <th style="text-align: right" colspan=3></th>';
-	table_head += '        <th style="text-align: right" colspan=2>' + get_formatted_date(month, year, 0) + '</th>';
-	table_head += '        <th style="text-align: right" colspan=2></th>';
-	table_head += '        <th style="text-align: right" colspan=2>' + get_formatted_date(month, year, 1) + '</th>';
-	table_head += '        <th style="text-align: right" colspan=2></th>';
-	table_head += '        <th style="text-align: right" colspan=2>YTD-' + year.toString() + '</th>';
-	table_head += '        <th style="text-align: right" colspan=2></th>';
-	table_head += '        <th style="text-align: right" colspan=2>YTD-' + (parseInt(year) - 1).toString() + '</th>';
-	table_head += '        <th style="text-align: right" colspan=2></th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=3></th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_date(month, year, 0) + '</th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1></th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_date(month, year, 1) + '</th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1></th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1>YTD ' + year.toString() + '</th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1></th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1>YTD ' + (parseInt(year) - 1).toString() + '</th>';
+	table_head += '        <th style="text-align: right; font-size: 10pt" colspan=1></th>';
 	table_head += '    </tr>';
 	table_head += '</thead>';
 
 	return table_head;
 }
 
-// ======================================================================
-// GETTER FUNCTIONS
-// ======================================================================
+function generate_table_body(message, curr_month_year, prev_month_year) {
+	var html = ""; // holds the html that is returned
 
-function get_formatted_account(account_object) {
+	html += '<tbody>'; // start html table body
+
+	// adds the Income section: contains 'Product Sales' and 'Other Income'
+	html += append_group_row("Income")
+	html += get_category_rows("Product Sales", message, curr_month_year, prev_month_year);
+	html += get_category_rows("Other Income", message, curr_month_year, prev_month_year);
+
+	// adds the 'Total Cost of Goods' and the 'Gross Margin' rows
+	html += append_gross_margin(message, curr_month_year, prev_month_year);
+
+	// adds the Income section: contains 'Operating Expenses' and 'Other Expenses'
+	html += append_group_row("Expenses")
+	html += get_category_rows("Operating Expenses", message, curr_month_year, prev_month_year);
+	html += get_category_rows("Other Expenses", message, curr_month_year, prev_month_year);
+	html += '</tbody>'; // end html table body
+
+	return html;
+}
+
+// ============================================================================================================================================
+// GETTER FUNCTIONS
+// ============================================================================================================================================
+
+function get_formatted_name(account_object) {
 	var account = "";
 	var indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";  // prints an indent
 
-	// check for indentation and print when needed
-	if (account_object["indent"] == 0) account = account_object["account"];
-	if (account_object["indent"] == 1) account = indent + account_object["account"];
-	if (account_object["indent"] == 2) account = indent + indent + account_object["account"];
+
+	// add the indent in a loop
+	for (let i = 0; i < account_object["indent"]; i++)
+		account += indent;
+	
+	// check if the account field has the print group name, otherwise we print the account name
+	// the split removes the number in front of the strings like "30 - Trade Sales" to "Trade Sales"
+	if (account_object["account"] != "")
+	 	if (account_object["is_group"] == 0) {
+			console.log(account_object);
+
+			let start = account_object["account"].indexOf("-");
+			account += account_object["account"].slice(start+2);
+		} else {
+			account += account_object["account"];
+	} else {
+		let start = account_object["account_name"].indexOf("-");
+		account += account_object["account_name"].slice(start+2);
+	}
 
 	return account;
 }
 
 function get_formatted_date(month, year, offset) {
-	return (month.toString() + " " + (parseInt(year) - offset).toString());
+	return ("&nbsp;" + month.toString().slice(0, 3) + " " + (parseInt(year) - offset).toString());
+}
+
+function get_formatted_number(number) {
+	var formatted_number = "";
+
+	// check for minus sign and add brackets if found
+	if (number.toString()[0] == "-")
+		formatted_number = "&nbsp;(" + number.toString().slice(1) + ")";
+	else
+		formatted_number = number.toString();
+
+
+	if (minus_to_brackets) 
+		return formatted_number;
+	else 
+		return number;
 }
 
 function get_category_rows(category_name, message, curr_month_year, prev_month_year) {
 	var index = 0;
 	var html = "";
 	var category_total = get_category_total(category_name, message, curr_month_year, prev_month_year);
+
+	let account   = "";
+	let curr_data = "";
+	let prev_data = "";
+	let curr_ytd  = "";
+	let prev_ytd  = "";
+	let indent    = "";
+	let is_group  = "";
 	
 	// find the beginning of this category and keep the index
-	while (message[1][index]["account"] != category_name && index < message[1].length) index++;
-	
-	html += append_group_row(get_formatted_account(message[1][index]));
+	while (message[1][index]["account"] != category_name && index < message[1].length) 
+		index++;
+
+	html += append_group_row(get_formatted_name(message[1][index]));
+
+	var print_groups = [];
+
 	index++;
-	
 	while (message[1][index]["parent_account"] == category_name) {
-		let account   = get_formatted_account(message[1][index]);
-		let curr_data = message[1][index][curr_month_year];
-		let prev_data = message[1][index][prev_month_year];
-		let curr_ytd  = message[1][index]["total"];
-		let prev_ytd  = message[1][index]["prev_year_total"];
+		account   = message[1][index]["account"];
+		curr_data = message[1][index][curr_month_year];
+		prev_data = message[1][index][prev_month_year];
+		curr_ytd  = message[1][index]["total"];
+		prev_ytd  = message[1][index]["prev_year_total"];
+		indent    = message[1][index]["indent"];
+		is_group  = message[1][index]["is_group"];
+
+		let group_found = false;
+		for (let j = 0; j < print_groups.length; j++) {
+			if (print_groups[j].account == account) {
+				print_groups[j].curr_data += curr_data;
+				print_groups[j].prev_data += prev_data;
+				print_groups[j].curr_ytd  += curr_ytd;
+				print_groups[j].prev_ytd  += prev_ytd;
+				print_groups[j].indent    = indent;
+				print_groups[j].is_group  = is_group;
+
+				group_found = true;
+				break;
+			}
+		}
+
+		if (!group_found) {
+			print_groups.push({
+				"account"   : account,
+				"curr_data" : curr_data,
+				"prev_data" : prev_data,
+				"curr_ytd"  : curr_ytd,
+				"prev_ytd"  : prev_ytd,
+				"indent"    : indent,
+				"is_group"  : is_group
+			});
+		}
+		
+		index++;
+		
+		if (!message[1][index]) 
+		break;
+	}
+	
+	for (let i = 0; i < print_groups.length; i++) {
+		account   = get_formatted_name(print_groups[i]);
+		// account   = print_groups[i].account;
+		curr_data = print_groups[i].curr_data;
+		prev_data = print_groups[i].prev_data;
+		curr_ytd  = print_groups[i].curr_ytd;
+		prev_ytd  = print_groups[i].prev_ytd;
 
 		html += append_data_row(category_total, account, curr_data, prev_data, curr_ytd, prev_ytd);
-
-		index++;
-		if (!message[1][index]) break;
 	}
 
 	html += append_total_row(category_name, category_total);
+
 	return html;
 }
 
@@ -188,10 +306,12 @@ function get_category_total(category_name, message, curr_month_year, prev_month_
 	var index = 0;
 	
 	// find the beginning of this category and keep the index
-	while (message[1][index]["account"] != category_name && index < message[1].length) index++;
+	while (message[1][index]["account"] != category_name && index < message[1].length) 
+		index++;
 	
 	// check that it is a subgroup of either Income or Expense
-	if (message[1][index]["indent"] == 1) index++;
+	if (message[1][index]["indent"] == 1) 
+		index++;
 
 	// everything under this subgroup is summed together into the array
 	while (message[1][index]["indent"] == 2 && index < message[1].length) {
@@ -203,26 +323,26 @@ function get_category_total(category_name, message, curr_month_year, prev_month_
 		index++
 
 		// break if end of array
-		if (!message[1][index]) break;
+		if (!message[1][index])
+			break;
 	}
 
 	// round down all the values before returning the array
-	for (let j = 0; j < total_values.length; j++) {
+	for (let j = 0; j < total_values.length; j++)
 		nf.format(Math.floor(total_values[j]));
-	}
 	
 	return total_values;
 }
 
-// ======================================================================
+// ============================================================================================================================================
 // APPEND FUNCTIONS
-// ======================================================================
+// ============================================================================================================================================
 
 function append_group_row(account) {
 	var html = "";
 
 	html += '<tr>';
-	html += '    <td colspan=3>' + account + '</td>';
+	html += '    <td style="font-size: 10pt" colspan=3>' + account + '</td>';
 	html += '</tr>';
 
 	return html
@@ -240,24 +360,24 @@ function append_data_row(total_array, account, curr_data, prev_data, curr_ytd, p
 	];
 
 	var percentages = [
-		((curr_data * 100) / total_array[0]).toString() + "%",
-		((prev_data * 100) / total_array[1]).toString() + "%",
-		((curr_ytd * 100)  / total_array[2]).toString() + "%",
-		((prev_ytd * 100)  / total_array[3]).toString() + "%"
+		get_formatted_number(((curr_data * 100) / total_array[0]).toFixed(2)) + "%",
+		get_formatted_number(((prev_data * 100) / total_array[1]).toFixed(2)) + "%",
+		get_formatted_number(((curr_ytd * 100)  / total_array[2]).toFixed(2)) + "%",
+		get_formatted_number(((prev_ytd * 100)  / total_array[3]).toFixed(2)) + "%"
 	];
 
 	html += '<tr>';
-	html += '    <td class="table-data-right" colspan=3>' + account + '</td>';
+	html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + account + '</td>';
 	for (let i = 0; i < 4; i++) {
-		html += '<td class="table-data-right" colspan=2>' + values[i] + '</td>';
-		html += '<td class="table-data-right" colspan=2>' + percentages[i] + '</td>';
+		html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+		html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + percentages[i] + '</td>';
 	}
 	html += '</tr>';
 
 	return html;
 }
 
-function append_total_row(category_name, category_total) {
+function append_total_row(category_name, category_total) { 
 	let nf = new Intl.NumberFormat('en-US');
 	var indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";  // prints an indent
 	var html = "";
@@ -270,10 +390,10 @@ function append_total_row(category_name, category_total) {
 	]
 
 	html += '<tr style="border-top: 1px solid black">';
-	html += '    <td class="table-data-right" colspan=3>' + indent + 'Total ' + category_name + '</td>';
+	html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + indent + 'Total ' + category_name + '</td>';
 	for (let i = 0; i < 4; i++) {
-		html += '<td class="table-data-right" colspan=2>' + values[i] + '</td>';
-		html += '<td class="table-data-right" colspan=2>100%</td>';
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>100%</td>';
 	}
 	html += '</tr>';
 	html += '<tr></tr>';
@@ -281,29 +401,59 @@ function append_total_row(category_name, category_total) {
 	return html;
 }
 
-function append_gross_margin(total_income, account, curr_data, prev_data, curr_ytd, prev_ytd) {
+function append_gross_margin(message, curr_month_year, prev_month_year) {
 	let nf = new Intl.NumberFormat('en-US');
 	var html = "";
-	
+	var total_income = [0.0, 0.0, 0.0, 0.0];
+
+	var total_cogs  = get_category_total("Cost of Goods Sold", message, curr_month_year, prev_month_year);
+	var total_sales = get_category_total("Product Sales", message, curr_month_year, prev_month_year);
+	var total_other = get_category_total("Other Income", message, curr_month_year, prev_month_year);
+
+	for (let i = 0; i < 4; i++)
+		total_income[i] += (total_sales[i] + total_other[i]);
+
 	var values = [
-		nf.format(Math.floor(total_income[0] - curr_data)),
-		nf.format(Math.floor(total_income[1] - prev_data)),
-		nf.format(Math.floor(total_income[2] - curr_ytd)),
-		nf.format(Math.floor(total_income[3] - prev_ytd))
+		total_income[0] - total_cogs[0],
+		total_income[1] - total_cogs[1],
+		total_income[2] - total_cogs[2],
+		total_income[3] - total_cogs[3]
 	];
 
 	var percentages = [
-		((total_income[0] - curr_data)*100 / total_income[0]).toString() + "%",
-		((total_income[1] - prev_data)*100 / total_income[1]).toString() + "%",
-		((total_income[2] - curr_ytd)*100 / total_income[2]).toString()  + "%",
-		((total_income[3] - prev_ytd)*100 / total_income[3]).toString()  + "%"
+		((total_income[0] - total_cogs[0])*100 / total_income[0]),
+		((total_income[1] - total_cogs[1])*100 / total_income[1]),
+		((total_income[2] - total_cogs[2])*100 / total_income[2]),
+		((total_income[3] - total_cogs[3])*100 / total_income[3])
 	];
 
-	html += '<tr style="border-top: 1px solid black">';
-	html += '    <td class="table-data-right" colspan=3>Gross Margin</td>';
+	var cogs_percentages = [
+		(100 - percentages[0]),
+		(100 - percentages[1]),
+		(100 - percentages[2]),
+		(100 - percentages[3])
+	];
+
 	for (let i = 0; i < 4; i++) {
-		html += '<td class="table-data-right" colspan=2>' + values[i] + '</td>';
-		html += '<td class="table-data-right" colspan=2>' + percentages[i] + '</td>';
+		total_cogs[i]       = nf.format(Math.floor(total_cogs[i])).toString();
+		values[i]           = nf.format(Math.floor(values[i])).toString();
+		percentages[i]      = percentages[i].toString() + "%";
+		cogs_percentages[i] = cogs_percentages[i].toString() + "%";
+	}
+
+	html += '<tr>';
+	html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>Cost of Goods Sold</td>';
+	for (let i = 0; i < 4; i++) {
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + total_cogs[i] + '</td>';
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + cogs_percentages[i] + '</td>';
+	}
+	html += '</tr>';
+
+	html += '<tr style="border-top: 1px solid black">';
+	html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>Gross Margin</td>';
+	for (let i = 0; i < 4; i++) {
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+		html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + percentages[i] + '</td>';
 	}
 	html += '</tr>';
 	html += '<tr></tr>';
@@ -311,9 +461,9 @@ function append_gross_margin(total_income, account, curr_data, prev_data, curr_y
 	return html;
 }
 
-// ======================================================================
+// ============================================================================================================================================
 // EXPORT FUNCTION
-// ======================================================================
+// ============================================================================================================================================
 
 var tables_to_excel = (function () {
 	var uri = 'data:application/vnd.ms-excel;base64,',
