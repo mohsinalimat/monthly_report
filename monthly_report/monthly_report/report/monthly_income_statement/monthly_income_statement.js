@@ -42,7 +42,9 @@ frappe.query_reports["Monthly Income Statement"] = {
 // ============================================================================================================================================
 /* 
 	To whoever is reading this, if this is the first time you are looking at this code, press Ctrl+K+0 to collapse everything on VS Code.
-	It'll give you an outline of the functions I wrote and, in effect, a better understanding of the flow of the code. 
+	
+	It'll give you an outline of the functions I wrote and, in effect, a better understanding of the flow of the code. You can expand it
+	back again by Ctrl+K+J.
 
 	The functions are written in order of appearance to the best of my ability. Begin at generate_table() and move along downwards. 
 
@@ -50,8 +52,8 @@ frappe.query_reports["Monthly Income Statement"] = {
 		-> the generator functions are the ones that generate the html that gets exported to excel.
 		-> the getter functions are supporting functions that get you the thing it says in its name.
 		-> the append functions are used to append one row or section of html based on the data passed to it.
-		-> tables_to_excel() is some sort of legacy code that I did not write, and is difficult to read. 
-			I've left it mostly untouched, but it does what it describes -- converts the tables to excel.
+		-> tables_to_excel() is some sort of legacy code that I did not write, and is difficult to read. I've left it mostly untouched,
+			but it does what it describes -- converts the tables to excel.
 		-> the global flags are essentially shorcuts to avoid commenting out stuff when I needed to test things.
 
 	Everything is made to be modular, as best as I could. Moving things around a bit should still allow things to work.
