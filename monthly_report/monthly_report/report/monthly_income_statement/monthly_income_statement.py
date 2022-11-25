@@ -215,7 +215,14 @@ def prepare_data(end_month_and_year, accounts, balance_must_be, period_list, com
         has_value = False
         total = 0
         prev_year_total = 0
-        print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", account.name)
+        print_group = frappe.db.sql(
+            """
+            SELECT  print_group 
+            FROM    tabAccount 
+            WHERE   name = %s
+            """,
+            account.name
+        )
 
         row = frappe._dict(
             {
@@ -399,13 +406,14 @@ def set_gl_entries_by_account(company, from_date, to_date, root_lft, root_rgt, f
 ## ======================================================================
 
 @frappe.whitelist()
-def get_records(report_name, filters):
+def get_records(filters):
     filterDt = json.loads(filters)
     filters = frappe._dict(filterDt or {})
 
     if not filters:
         return [], [], None, []
 
+    print("(0) validating filters")
     validate_filters(filters)
     print("(1) getting period")
     period  = get_period(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
@@ -430,7 +438,9 @@ def get_records(report_name, filters):
 
 ## validates the filters for the get_records() function
 def validate_filters(filters):
-    selected_month = filters.period_end_month
-    selected_year = filters.to_fiscal_year
-    if not selected_month: frappe.throw(_("Please select a month."))
-    if not selected_year:  frappe.throw(_("Please select a year."))
+    if not filters.period_end_month:
+        frappe.throw(_("Please select a month."))
+    if not filters.to_fiscal_year:
+        frappe.throw(_("Please select a year."))
+    if not filters.cost_center:
+        frappe.throw(_("Please select at least one cost center."))
