@@ -58,19 +58,6 @@ frappe.query_reports["Monthly Income Statement"] = {
 					}
 				}
 			});
-
-			// console.log(filters.cost_center);
-
-			// console.log("\n");
-			// if (filters.cost_center[0]) console.log(filters.cost_center[0]);
-			// if (filters.cost_center[1]) console.log(filters.cost_center[1]);
-			// if (filters.cost_center[2]) console.log(filters.cost_center[2]);
-			// if (filters.cost_center[3]) console.log(filters.cost_center[3]);
-			// if (filters.cost_center[4]) console.log(filters.cost_center[4]);
-
-			// filters.cost_center = [];
-			// console.log(filters.cost_center[3] = "");
-
 		});
 	},
 }
@@ -79,10 +66,10 @@ frappe.query_reports["Monthly Income Statement"] = {
 // GLOBAL FLAGS
 // ============================================================================================================================================
 
-
 var minus_to_brackets = 0; 	// flag that determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
-var capitalized_names = 1; 	// account names will be in block letters or sentence case
+var capitalized_names = 0; 	// account names will be in block letters or sentence case
 var download_excel = 1; 	// flag that determines if the excel spreadsheet is to be downloaded at the end of processing
+var console_log = 0; 		// flag that determines if console logs should be printed
 
 // ============================================================================================================================================
 // GENERATOR FUNCTIONS
@@ -120,9 +107,8 @@ function generate_tables(message, company, month, year, cost_centers) {
 	$(".report-wrapper").append(html);
 
 	var center_numbers = ["0"];
-	for (let i = 0; i < cost_centers.length; i++) {
+	for (let i = 0; i < cost_centers.length; i++)
 		center_numbers.push(cost_centers[i].slice(1, 2));
-	}
 
 	if (download_excel)
 		tables_to_excel(tables_array, curr_month_year +'.xls', center_numbers);
@@ -190,38 +176,27 @@ function generate_table_head(month, year) {
 function generate_table_body(message, curr_month_year, prev_month_year) {
 	var html = ""; // holds the html that is returned
 
+	var categories = [
+		"Product Sales",
+		"Other Income",
+		"Cost of Goods Sold",
+		"Operating Expenses",
+		"Other Expenses"
+	]
+	
 	html += '<tbody>'; // start html table body
+	for (let i = 0; i < categories.length; i++) {
+		if (i == 0)
+			html += append_group_row("Income");
+		if (i == 3) 
+			html += append_group_row("Expenses");
 
-	// adds the Income section: contains 'Product Sales' and 'Other Income'
-	html += append_group_row("Income")
-
-	if (category_exists(message, "Product Sales"))
-		html += get_category_rows("Product Sales", message, curr_month_year, prev_month_year);
-	else 
-		console.log("[!] Product Sales does not exists");
-
-	if (category_exists(message, "Other Income"))
-		html += get_category_rows("Other Income", message, curr_month_year, prev_month_year);
-	else 
-		console.log("[!] Other Income does not exists");
-
-	// adds the 'Total Cost of Goods' and the 'Gross Margin' rows
-	if (category_exists(message, "Cost of Goods Sold"))
-		html += append_gross_margin(message, curr_month_year, prev_month_year);
-	else 
-		console.log("[!] Cost of Goods Sold does not exists");
-
-	// adds the Income section: contains 'Operating Expenses' and 'Other Expenses'
-	html += append_group_row("Expenses")
-	if (category_exists(message, "Operating Expenses"))
-		html += get_category_rows("Operating Expenses", message, curr_month_year, prev_month_year);
-	else 
-		console.log("[!] Operating Expenses does not exists");
-
-	if (category_exists(message, "Other Expenses"))
-		html += get_category_rows("Other Expenses", message, curr_month_year, prev_month_year);
-	else 
-		console.log("[!] Other Expenses does not exists");
+		if (category_exists(message, categories[i]))
+			html += get_category_rows(categories[i], message, curr_month_year, prev_month_year);
+		else 
+			if (console_log) 
+				console.log("[!] " + categories[i] + " does not exists");
+	}
 	html += '</tbody>'; // end html table body
 
 	return html;
@@ -306,6 +281,7 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 	var index = 0;
 	var html = "";
 	var category_total = get_category_total(category_name, message, curr_month_year, prev_month_year);
+	var print_groups = [];
 
 	let account   = "";
 	let curr_data = "";
@@ -321,9 +297,13 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 
 	html += append_group_row(get_formatted_name(message[1][index]));
 
-	var print_groups = [];
-
 	index++;
+
+	// gather each row's data under the current category
+	// also compresses the accounts based on print groups
+
+	// if a print group already exists in print_groups[], sum up their values 
+	// if it does not exist already, append that group to print_groups[] along with its data
 	while (message[1][index]["parent_account"] == category_name) {
 		account   = message[1][index]["account"];
 		curr_data = message[1][index][curr_month_year];
@@ -333,6 +313,7 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 		indent    = message[1][index]["indent"];
 		is_group  = message[1][index]["is_group"];
 
+		// this section compares the current print group against existing print groups
 		let group_found = false;
 		for (let j = 0; j < print_groups.length; j++) {
 			if (print_groups[j].account == account) {
@@ -348,7 +329,9 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 			}
 		}
 
+		// if the print group was not found, append it to the end
 		if (!group_found) {
+			// create an object containing the info and push() to print_groups[]
 			print_groups.push({
 				"account"   : account,
 				"curr_data" : curr_data,
@@ -362,13 +345,14 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 		
 		index++;
 		
+		// break the loop if no more rows exist in the source array
 		if (!message[1][index]) 
-		break;
+			break;
 	}
 	
+	// adds each row's gathered data to the html
 	for (let i = 0; i < print_groups.length; i++) {
 		account   = get_formatted_name(print_groups[i]);
-		// account   = print_groups[i].account;
 		curr_data = print_groups[i].curr_data;
 		prev_data = print_groups[i].prev_data;
 		curr_ytd  = print_groups[i].curr_ytd;
@@ -377,15 +361,16 @@ function get_category_rows(category_name, message, curr_month_year, prev_month_y
 		html += append_data_row(category_total, account, curr_data, prev_data, curr_ytd, prev_ytd);
 	}
 
+	// appends a row containing the total values for the current category
 	html += append_total_row(category_name, category_total);
 
-	console.log(" --> Appended " + category_name);
+	if (console_log) console.log(" --> Appended " + category_name);
 
 	return html;
 }
 
 function get_category_total(category_name, message, curr_month_year, prev_month_year) {
-	console.log("\t[" + category_name + "] calculating total");
+	if (console_log) console.log("\t[" + category_name + "] calculating total");
 
 	let nf = new Intl.NumberFormat('en-US');
 	var total_values  = [0.0, 0.0, 0.0, 0.0]; // array of totals for Income
@@ -417,21 +402,22 @@ function get_category_total(category_name, message, curr_month_year, prev_month_
 	for (let j = 0; j < total_values.length; j++)
 		nf.format(Math.floor(total_values[j]));
 	
-	console.log("\t[" + category_name + "] total calculated");
+	if (console_log) console.log("\t[" + category_name + "] total calculated");
 	return total_values;
 }
 
 function category_exists(message, category_name) {
-	
 	var category_exists = false;
 
 	for (let i = 0; i < message[1].length; i++) {
 		if (message[1][i]["account"] == category_name){
-			console.log(category_name + " exists");
 			category_exists = true;
 			break;
 		}
 	}
+
+	if (category_exists) 
+		if (console_log) console.log(category_name + " exists");
 
 	return category_exists;
 }
@@ -510,7 +496,7 @@ function append_total_row(category_name, category_total) {
 }
 
 function append_gross_margin(message, curr_month_year, prev_month_year) {
-	console.log("Calculating Gross Margin");
+	if (console_log) console.log("Calculating Gross Margin");
 
 	let nf = new Intl.NumberFormat('en-US');
 	var html = "";
@@ -575,7 +561,7 @@ function append_gross_margin(message, curr_month_year, prev_month_year) {
 	html += '</tr>';
 	html += '<tr></tr>';
 
-	console.log("Appended Gross Margin");
+	if (console_log) console.log("Appended Gross Margin");
 	return html;
 }
 
