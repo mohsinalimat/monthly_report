@@ -413,17 +413,13 @@ def get_records(filters):
     if not filters:
         return [], [], None, []
 
-    print("(0) validating filters")
     validate_filters(filters)
-    print("(1) getting period")
     period  = get_period(filters.to_fiscal_year, filters.periodicity, filters.period_end_month, company = filters.company)
     print("(2) getting income")
     income  = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Income", "Credit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
     print("(3) getting expense")
     expense = get_data(filters.period_end_month, filters.to_fiscal_year, filters.company, "Expense", "Debit", period, filters = filters, accumulated_values = filters.accumulated_values, ignore_closing_entries = True, ignore_accumulated_values_for_fy = True)
-    print("(4) getting columns")
     columns = get_columns(filters.period_end_month, filters.to_fiscal_year, filters.periodicity, period)
-    print("(5) download started")
 
     data = []
     data.extend(income or [])

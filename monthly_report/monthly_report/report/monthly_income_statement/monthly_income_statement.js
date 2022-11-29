@@ -41,25 +41,65 @@ frappe.query_reports["Monthly Income Statement"] = {
 		report.page.add_inner_button(__("Export Report"), function () {
 			let filters = report.get_values();
 
-			frappe.call({
-				method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_records',
-				args: {
-					filters: filters
-				},
+			// stores the names of the cost centers from the filters for later use
+			var cc_in_filters = filters.cost_center;
 
-				callback: function (r) {
-					$(".report-wrapper").html("")
-					$(".justify-center").remove()
+			// an array to store the consolidated, followed by each cost center's data
+			var cc_consolidated = [];
 
-					if (r.message[1] != "") {
-						generate_tables(r.message, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center)
-					} else {
-						alert("No record found.")
-					}
+			// names of all cost centers
+			var cc_names = [
+				'01 - White-Wood Corporate - WW',
+				'02 - White-Wood Distributors Winnipeg - WW',
+				'03 - Forest Products - WW',
+				'06 - Endeavours - WW',
+				'consolidated'
+			];
+
+			// loop through cost centers and call get_records() on each -- gather single cost center data
+			// and append the dataset to cc_consolidated[]
+			for (let i = 0; i < cc_names.length; i++) {
+				if (cc_in_filters.includes(cc_names[i])) {
+					filters.cost_center = [cc_names[i]]; 
+
+					frappe.call({
+						method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_records',
+						args: {filters: filters},
+		
+						callback: function (r) {
+							cc_consolidated.push(r.message);
+							show_alert('Gathered Data for ' + cc_names[i].slice(0,-5), 5);
+						}
+					});
+
+				} else if (cc_names[i] == "consolidated") {
+					filters.cost_center = cc_in_filters; // restore the original list of cost centers
+
+					frappe.call({
+						method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_records',
+						args: {filters: filters},
+
+						callback: function (r) {
+							cc_consolidated.push(r.message); // push the consolidated dataset to the end
+							cc_consolidated.reverse(); // reverse the order of the array to bring consolidated to [0]
+
+							// finally generate the tables using each cost center dataset
+							generate_tables(cc_consolidated, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center, true)
+						}
+					});
 				}
-			});
+				wait(1000);
+			}
 		});
 	},
+}
+
+var wait = (ms) => {
+    const start = Date.now();
+    let now = start;
+    while (now - start < ms) {
+      now = Date.now();
+    }
 }
 
 // ============================================================================================================================================
@@ -75,28 +115,38 @@ var console_log = 0; 		// flag that determines if console logs should be printed
 // GENERATOR FUNCTIONS
 // ============================================================================================================================================
 
-function generate_tables(message, company, month, year, cost_centers) {
+function generate_tables(dataset, company, month, year, cost_centers, consolidate) {
+	// dataset[0] contains the consolidated data
+	message = dataset[0];
+
+	// give each table an ID to later identify them in the export function
 	var $table_id  = "consolidated";
 	var tables_array = [("#" + $table_id)];
+
+	// date info needed to generate the tables
 	var month_name = (month.slice(0, 3)).toLowerCase();
 	var curr_month_year = month_name + "_" + year;
 	var prev_month_year = month_name + "_" + (parseInt(year) - 1).toString();
 
+	// html that gets sent to the export function
+	// populate it with consolidated data as it must always be present
 	var html = generate_consolidated(company, month, year, message, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement");
 
-	if (cost_centers.length == 1) {
+	if (cost_centers.length == 1) { // if only one cost center was chosen we just populated both spreadsheets with the same data as they are identical
 		$table_id  = "table_0";
 		tables_array.push("#" + $table_id);
 		html += generate_consolidated(company, month, year, message, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"));
-	} else {
+	
+	} else { // when there are multiple cost centers we process them differently
 		for (let i = 0; i < cost_centers.length; i++) {
 			$table_id  = "table_" + i;
 			tables_array.push("#" + $table_id);
 	
 			html += '<div id="data">';
 			html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-			html += generate_table_caption(company, month, year, (cost_centers[i].slice(5, -5) + " Income Statement"))
-			html += generate_table_head(month, year)
+			html += generate_table_caption(company, month, year, (cost_centers[i].slice(5, -5) + " Income Statement"));
+			html += generate_table_head(month, year);
+			html += generate_table_body(dataset[i+1], curr_month_year, prev_month_year);
 			html += '</table>';
 			html += '</div>';
 		}	
@@ -106,11 +156,13 @@ function generate_tables(message, company, month, year, cost_centers) {
 	$(".report-wrapper").hide();
 	$(".report-wrapper").append(html);
 
+	// process the cost center numbers to creat the excel sheet names on the tabs
 	var center_numbers = ["0"];
 	for (let i = 0; i < cost_centers.length; i++)
 		center_numbers.push(cost_centers[i].slice(1, 2));
 
-	if (download_excel)
+	// flags to control the export and download -- used for testing without filling the downloads folder with junk
+	if (download_excel && consolidate)
 		tables_to_excel(tables_array, curr_month_year +'.xls', center_numbers);
 }
 
@@ -121,9 +173,9 @@ function generate_consolidated(company, month, year, message, curr_month_year, p
 	// the table containing all the data in html format
 	html += '<div id="data">';
 	html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-	html += generate_table_caption(company, month, year, title)
-	html += generate_table_head(month, year)
-	html += generate_table_body(message, curr_month_year, prev_month_year)
+	html += generate_table_caption(company, month, year, title);
+	html += generate_table_head(month, year);
+	html += generate_table_body(message, curr_month_year, prev_month_year);
 	html += '</table>';
 	html += '</div>';
 
