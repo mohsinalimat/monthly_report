@@ -44,6 +44,7 @@ frappe.query_reports["Monthly Income Statement"] = {
 			// for testing
 			filters.cost_center = [
 				'01 - White-Wood Corporate - WW',
+				'02 - White-Wood Distributors Winnipeg - WW',
 				'03 - Forest Products - WW',
 				'06 - Endeavours - WW',
 			];
@@ -67,8 +68,14 @@ frappe.query_reports["Monthly Income Statement"] = {
 			// and append the dataset to cc_consolidated[]
 			for (let i = 0; i < cc_names.length; i++) {
 				if (cc_in_filters.includes(cc_names[i])) {
-					filters.cost_center = [cc_names[i]]; 
-					
+					filters.cost_center = [cc_names[i]];
+
+					let cc_name = cc_names[i].slice(0, -5);
+
+					if (cc_name.length > 28)
+						cc_name = (cc_names[i].slice(0, -5)).slice(0, 28) + "...";
+
+					show_alert({message: 'Retrieving ' + cc_name, indicator: 'blue'}, 15);
 					frappe.call({
 						method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_records',
 						args: {filters: filters},
@@ -76,10 +83,10 @@ frappe.query_reports["Monthly Income Statement"] = {
 						callback: function (r) {
 							r.message[0][0]["fieldtype"] = cc_names[i];
 							cc_consolidated.push(r.message);
-							show_alert({message: 'Retrieved: ' + cc_names[i].slice(0, -5), indicator: 'green'}, 7);
+							show_alert({message: 'Retrieved ' + cc_name, indicator: 'green'}, 5);
 						}
 					});
-					wait(1000);
+					wait(250);
 
 				} else if (cc_names[i] == "consolidated") {
 					filters.cost_center = cc_in_filters; // restore the original list of cost centers
