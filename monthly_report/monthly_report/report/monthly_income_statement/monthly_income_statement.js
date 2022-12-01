@@ -64,6 +64,8 @@ frappe.query_reports["Monthly Income Statement"] = {
 				'consolidated'
 			];
 
+			var thread_lock = 0;
+
 			// loop through cost centers and call get_records() on each -- gather single cost center data
 			// and append the dataset to cc_consolidated[]
 			for (let i = 0; i < cc_names.length; i++) {
@@ -75,7 +77,11 @@ frappe.query_reports["Monthly Income Statement"] = {
 					if (cc_name.length > 28)
 						cc_name = (cc_names[i].slice(0, -5)).slice(0, 28) + "...";
 
-					show_alert({message: 'Retrieving ' + cc_name, indicator: 'blue'}, 15);
+					if (cc_names[i] == '02 - White-Wood Distributors Winnipeg - WW') 
+						show_alert({message: 'Retrieving ' + cc_name, indicator: 'blue'}, 12);
+					else
+						show_alert({message: 'Retrieving ' + cc_name, indicator: 'blue'}, 4);
+
 					frappe.call({
 						method: 'monthly_report.monthly_report.report.monthly_income_statement.monthly_income_statement.get_records',
 						args: {filters: filters},
@@ -83,10 +89,13 @@ frappe.query_reports["Monthly Income Statement"] = {
 						callback: function (r) {
 							r.message[0][0]["fieldtype"] = cc_names[i];
 							cc_consolidated.push(r.message);
-							show_alert({message: 'Retrieved ' + cc_name, indicator: 'green'}, 5);
+
+							thread_lock++;
+							console.log("threads returned = " + thread_lock);
+
+							show_alert({message: 'Retrieved ' + cc_name, indicator: 'green'}, 4);
 						}
 					});
-					wait(250);
 
 				} else if (cc_names[i] == "consolidated") {
 					filters.cost_center = cc_in_filters; // restore the original list of cost centers
@@ -99,9 +108,13 @@ frappe.query_reports["Monthly Income Statement"] = {
 							cc_consolidated.push(r.message); // push the consolidated dataset to the end
 							cc_consolidated.reverse(); // reverse the order of the array to bring consolidated to [0]
 
+							// wait until all threads return with cost center data
+							while (thread_lock < cc_in_filters.length && seconds < 30) {}
+
+							console.log("lock released");
+							
 							// finally generate the tables using each cost center dataset
-							show_alert({message: 'Generating tables', indicator: 'green'}, 7);
-							wait(500);
+							show_alert({message: 'Exporting spreadsheet', indicator: 'green'}, 4);
 							generate_tables(cc_consolidated, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center, true);
 						}
 					});
@@ -125,7 +138,7 @@ var wait = (ms) => {
 
 var minus_to_brackets = 0; 	// flag that determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
 var capitalized_names = 0; 	// account names will be in block letters or sentence case
-var download_excel = 1; 	// flag that determines if the excel spreadsheet is to be downloaded at the end of processing
+var download_excel = 0; 	// flag that determines if the excel spreadsheet is to be downloaded at the end of processing
 var console_log = 0; 		// flag that determines if console logs should be printed
 
 // ============================================================================================================================================
