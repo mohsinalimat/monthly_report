@@ -63,28 +63,26 @@ frappe.query_reports["Monthly Income Statement"] = {
     "filters": [
         {"fieldname": 'company',          "label": "Company",         "fieldtype": 'Link',   "reqd": false, "hidden": true,  "default": frappe.defaults.get_user_default('company'),     "options": 'Company'},
         {"fieldname": "finance_book",     "label": "Finance Book",    "fieldtype": "Link",   "reqd": false, "hidden": true,                                                              "options": "Finance Book"},
-        {"fieldname": "to_fiscal_year",   "label": "End Year",        "fieldtype": "Link",   "reqd": true,  "hidden": false, "default": frappe.defaults.get_user_default("fiscal_year"), "options": "Fiscal Year", "depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"},
+        {"fieldname": "to_fiscal_year",   "label": "End Year",        "fieldtype": "Link",   "reqd": true,  "hidden": false, "default": frappe.defaults.get_user_default("fiscal_year")-1, "options": "Fiscal Year", "depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"},
         {"fieldname": "period_end_month", "label": "Month",           "fieldtype": "Select", "reqd": true,  "hidden": false, "default": "January", "mandatory": 0, "wildcard_filter": 0, "options": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]},
         {"fieldname": "periodicity",      "label": "Periodicity",     "fieldtype": "Select", "reqd": true,  "hidden": true,  "default": "Monthly",                                       "options": [{ "value": "Monthly", "label": __("Monthly") }]},
         {"fieldname": "filter_based_on",  "label": "Filter Based On", "fieldtype": "Select", "reqd": true,  "hidden": true,  "default": ["Fiscal Year"],                                 "options": ["Fiscal Year", "Date Range"]},
-        {"fieldname": "report_type",      "label": "Report Type",     "fieldtype": "Select", "reqd": true,  "hidden": false, "default": ["Regular"],                                     "options": ["Expanded", "Regular", "Minimal"]},
+        {"fieldname": "report_type",      "label": "Report Type",     "fieldtype": "Select", "reqd": true,  "hidden": false, "default": ["Regular"],                                     "options": ["Detailed", "Regular", "Skinny"]},
         {"fieldname": "cost_center",      "label": "Cost Center",     "fieldtype": "MultiSelectList", get_data: function (txt) {return frappe.db.get_link_options('Cost Center', txt, {company: frappe.query_report.get_filter_value("company")});}},
     ],
 
     onload: function(report) {
         report.page.add_inner_button(__("Export Report"), function () {
             let filters = report.get_values();
-
-            /*             
+        
             // ------------- for testing, make sure this is commented out -------------
             filters.cost_center = [
-                '01 - White-Wood Corporate - WW',
-                '02 - White-Wood Distributors Winnipeg - WW',
-                '03 - Forest Products - WW',
+                // '01 - White-Wood Corporate - WW',
+                // '02 - White-Wood Distributors Winnipeg - WW',
+                // '03 - Forest Products - WW',
                 '06 - Endeavours - WW',
             ];
             // ------------- for testing, make sure this is commented out -------------
-            */
 
             // an array to store the consolidated, followed by each cost center's data
             var dataset = [];
@@ -881,9 +879,10 @@ function append_data_row(total_array, account, data, mode) {
     var percentages = [];
         
     html += '<tr>';
-    html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + account + '</td>';
+ 
 
     if (mode == "income_statement") {
+        html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + account + '</td>';
         for (let i = 0; i < data.length; i++) {
             // round down and format the number to 2 decimal places
             values.push((nf.format(Math.floor(data[i]))));
@@ -903,6 +902,7 @@ function append_data_row(total_array, account, data, mode) {
             }
         }
     } else if (mode == "trailing_12_months") {
+        html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + account + '</td>';
         for (let i = 0; i < data.length; i++)			
             values.push((nf.format(Math.floor(data[i])))); // round down and format the number to 2 decimal places
 
@@ -920,6 +920,7 @@ function append_data_row(total_array, account, data, mode) {
             html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + percentage + '</td>';
         }
     } else if (mode == "balance_sheet") {
+        html += '<td class="table-data-right" style="font-size: 10pt" colspan=3>' + account + indent + indent + indent + indent + '</td>';
         html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + (nf.format(Math.floor(data[0]))) + '</td>';
         html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + (nf.format(Math.floor(data[1]))) + '</td>';
     }
