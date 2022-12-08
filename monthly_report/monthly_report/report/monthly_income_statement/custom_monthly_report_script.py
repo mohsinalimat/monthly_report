@@ -8,12 +8,14 @@ from frappe.query_builder.functions import Max
 from frappe.utils import date_diff, flt, getdate, cint, flt
 from erpnext.controllers.queries import get_match_cond
 from erpnext.accounts.report.financial_statements import *
+from erpnext.accounts.report.balance_sheet.balance_sheet import (execute, check_opening_balance, get_provisional_profit_loss)
 from erpnext.stock.utils import get_incoming_rate
 from collections import OrderedDict
 
 global_fiscal_year = 0
 balance_sheet_start_date = ""
 balance_sheet_end_date = ""
+old_method = False
 
 
 ## ============================================================================================================================================
@@ -25,9 +27,13 @@ balance_sheet_end_date = ""
 @frappe.whitelist()
 def generate_monthly_report(filters):
     filters = frappe._dict(json.loads(filters) or {})
+    
+    data = []
+    dataset = []
 
-    # for item in filters.cost_center:
-    #     print(item)
+    # first append the header for Consolidated
+    dataset_header = [{"dataset_for": "Consolidated"}]
+    dataset.append(dataset_header)
 
     # validate the selected filters
     if not filters:
@@ -39,6 +45,7 @@ def generate_monthly_report(filters):
     if not filters.cost_center:
         frappe.throw(_("Please select at least one cost center."))
 
+    print("Getting data for Consolidated")
 
     period = get_income_statement_period(
         to_fiscal_year            = filters.to_fiscal_year,
@@ -49,8 +56,6 @@ def generate_monthly_report(filters):
         reset_period_on_fy_change = True,   # default value
         ignore_fiscal_year        = False   # default value
     )
-
-    print("Getting data for Consolidated")
 
     income = get_income_statement_data(
         period_end_month                 = filters.period_end_month,
@@ -82,16 +87,9 @@ def generate_monthly_report(filters):
         total                            = True   # default value
     )
 
-    data = []
-    dataset = []
-
-    # first append the header for Consolidated
-    dataset_header = [{"dataset_for": "Consolidated"}]
-    dataset.append(dataset_header)
-
     # then append the dataset for Consolidated
-    data.extend(income or [])
-    data.extend(expense or [])
+    data.extend(income)
+    data.extend(expense)
     dataset.append(data)
 
     # generate the balance sheet
@@ -107,6 +105,8 @@ def generate_monthly_report(filters):
         dataset.append(cost_center_data[0])
         dataset.append(cost_center_data[1])
 
+    
+    print("Dataset returned")
     return dataset
 
 
@@ -235,8 +235,8 @@ def get_income_statement_period(to_fiscal_year, periodicity, period_end_month, c
     global balance_sheet_end_date
     global balance_sheet_start_date
     global_fiscal_year = fiscal_year
-    balance_sheet_start_date = year_end_date
-    balance_sheet_end_date = year_start_date
+    balance_sheet_start_date = year_start_date 
+    balance_sheet_end_date = year_end_date
 
     period_list = []
     start_date = year_start_date
@@ -535,6 +535,8 @@ def set_income_statement_entries(company, from_date, to_date, root_lft, root_rgt
 
 
 def get_balance_sheet(filters):
+    columns = [{"dataset_for": "Balance Sheet"}]
+    data = []
     cost_centers_string = (str(filters.cost_center)).replace("\'", "\"")
 
     new_filters_string = (
@@ -552,103 +554,78 @@ def get_balance_sheet(filters):
 
     new_filters = frappe._dict(json.loads(new_filters_string) or {})
 
-    period_list = get_period_list(new_filters.from_fiscal_year, new_filters.to_fiscal_year, balance_sheet_end_date, balance_sheet_start_date, new_filters.filter_based_on, new_filters.periodicity, company = new_filters.company)
-    asset       = get_balance_sheet_data(new_filters.company, "Asset",     "Debit",  period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
-    liability   = get_balance_sheet_data(new_filters.company, "Liability", "Credit", period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
-    equity      = get_balance_sheet_data(new_filters.company, "Equity",    "Credit", period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
-    
-    provisional_profit_loss, total_credit = get_provisional_profit_loss(asset, liability, equity, period_list, new_filters.company)
-    opening_balance = check_opening_balance(asset, liability, equity)
+    if old_method:
+        period_list = get_period_list(new_filters.from_fiscal_year, new_filters.to_fiscal_year, balance_sheet_start_date, balance_sheet_end_date, new_filters.filter_based_on, new_filters.periodicity, company = new_filters.company)
+        asset       = get_balance_sheet_data(new_filters.company, "Asset",     "Debit",  period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
+        liability   = get_balance_sheet_data(new_filters.company, "Liability", "Credit", period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
+        equity      = get_balance_sheet_data(new_filters.company, "Equity",    "Credit", period_list, filters = new_filters, accumulated_values = new_filters.accumulated_values, only_current_fiscal_year = False)
 
-    columns = [{"dataset_for": "Balance Sheet"}]
-    data = []
-    data.extend(asset or [])
-    data.extend(liability or [])
-    data.extend(equity or [])
+        provisional_profit_loss, total_credit = get_provisional_profit_loss(asset, liability, equity, period_list, new_filters.company)
+        opening_balance = check_opening_balance(asset, liability, equity)
 
-    if opening_balance and opening_balance != 0:
-        unclosed = {
-            "account_name": "'" + _("Unclosed Fiscal Years Profit / Loss (Credit)") + "'",
-            "account": "'" + _("Unclosed Fiscal Years Profit / Loss (Credit)") + "'",
-            "warn_if_negative": True,
-        }
-        for period in period_list:
-            unclosed[period.key] = opening_balance
-            # if provisional_profit_loss:
-            #     provisional_profit_loss[period.key] = provisional_profit_loss[period.key] - opening_balance
+        data.extend(asset or [])
+        data.extend(liability or [])
+        data.extend(equity or [])
 
-        unclosed["total"] = opening_balance
-        data.append(unclosed)
+        if opening_balance and round(opening_balance[1], 2) != 0:
+            unclosed = {
+                "account_name": "'" + _("Unclosed Fiscal Years Profit / Loss (Credit)") + "'",
+                "account": "'" + _("Unclosed Fiscal Years Profit / Loss (Credit)") + "'",
+                "warn_if_negative": True,
+            }
+            for period in period_list:
+                unclosed[period.key] = opening_balance
+                if provisional_profit_loss:
+                    provisional_profit_loss[period.key] = provisional_profit_loss[period.key] - opening_balance[1]
 
-    if provisional_profit_loss:
-        data.append(provisional_profit_loss)
+            unclosed["total"] = opening_balance
+            data.append(unclosed)
 
-    if total_credit:
-        data.append(total_credit)
+        if provisional_profit_loss:
+            data.append(provisional_profit_loss)
+
+        if total_credit:
+            data.append(total_credit)
+    else:
+        data = execute(new_filters)[1]
+
+        for row in data:
+            if (not row):
+                print()
+            else:
+                if ("Total Asset (Debit)" not in row["account_name"] and
+                    "Total Liability (Credit)" not in row["account_name"] and
+                    "Provisional Profit / Loss (Credit)" not in row["account_name"] and
+                    "Total (Credit)" not in row["account_name"]
+                ):
+                    print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", row["account"])
+
+                    if print_group:
+                        row["print_group"] = print_group[0][0]
+
+                    if (row["account"][-5:] == " - WW"):
+                        row["account"] = (row["account"])[:-5]
+
+                    if (row["parent_account"][-5:] == " - WW"):
+                        row["parent_account"] = (row["parent_account"])[:-5]
+
+                    if (row["is_group"] == False): 
+                        row["account"] = print_group[0][0]
+
+                    if (row["account"] and row["account"] == ""):
+                        row["account"] = row["account_name"]
+                        
+                    if (row["indent"] == 3):
+                        row["indent"] = 2
+
+                    if (row["parent_account"] == "Accounts Receivable" or row["parent_account"] == "Bank" or row["parent_account"] == "Inventory" or row["parent_account"] == "Other Current Assets"): 
+                        row["parent_account"] = "Current Assets"
+
+                    if (row["account"]):
+                        row["account"].replace("'", "")
+
 
     return columns, data
-
-
-## forked from balance_sheet.py
-def get_provisional_profit_loss(asset, liability, equity, period_list, company, consolidated=False):
-    provisional_profit_loss = {}
-    total_row = {}
-    if asset and (liability or equity):
-        total = total_row_total = 0
-        total_row = {
-            "account_name": "'" + _("Total (Credit)") + "'",
-            "account": "'" + _("Total (Credit)") + "'",
-            "warn_if_negative": True,
-        }
-        has_value = False
-
-        for period in period_list:
-            key = period if consolidated else period.key
-            effective_liability = 0.0
-            if liability:
-                effective_liability += flt(liability[-2].get(key))
-            if equity:
-                effective_liability += flt(equity[-2].get(key))
-
-            provisional_profit_loss[key] = flt(asset[-2].get(key)) - effective_liability
-            total_row[key] = effective_liability + provisional_profit_loss[key]
-
-            if provisional_profit_loss[key]:
-                has_value = True
-
-            total += flt(provisional_profit_loss[key])
-            provisional_profit_loss["total"] = total
-
-            total_row_total += flt(total_row[key])
-            total_row["total"] = total_row_total
-
-        if has_value:
-            provisional_profit_loss.update({
-                "account_name": "'" + _("Provisional Profit / Loss (Credit)") + "'",
-                "account": "'" + _("Provisional Profit / Loss (Credit)") + "'",
-                "warn_if_negative": True,
-            })
-
-    return provisional_profit_loss, total_row
-
-
-## forked from balance_sheet.py
-def check_opening_balance(asset, liability, equity):
-    # Check if previous year balance sheet closed
-    opening_balance = 0
-    float_precision = cint(frappe.db.get_default("float_precision")) or 2
-    
-    if asset:
-        opening_balance = flt(asset[-1].get("opening_balance", 0), float_precision)
-    if liability:
-        opening_balance -= flt(liability[-1].get("opening_balance", 0), float_precision)
-    if equity:
-        opening_balance -= flt(equity[-1].get("opening_balance", 0), float_precision)
-
-    opening_balance = flt(opening_balance, float_precision)
-    if opening_balance:
-        return _("Previous Financial Year is not closed"), opening_balance
-    return None, None
 
 
 ## overriden from financial_statements.py
@@ -666,21 +643,34 @@ def get_balance_sheet_data(company, root_type, balance_must_be, period_list, fil
     # extracts the root of the trees "Asset" and "Liability"
     # only two elements in this dict
     print("\tgetting list of accounts -- balance sheet [" + root_type + "]")
-    accounts_list = frappe.db.sql(
-        """
-        SELECT  lft, rgt 
-        FROM    tabAccount
-        WHERE   root_type=%s AND IFNULL(parent_account, '') = ''
-        """,
+    
+    gl_entries_by_account = {}
+    for root in frappe.db.sql(
+        """select lft, rgt from tabAccount
+            where root_type=%s and ifnull(parent_account, '') = ''""",
         root_type,
-        as_dict = True
+        as_dict=1,
+    ):
+
+        set_gl_entries_by_account(
+            company,
+            period_list[0]["year_start_date"] if only_current_fiscal_year else None,
+            period_list[-1]["to_date"],
+            root.lft,
+            root.rgt,
+            filters,
+            gl_entries_by_account,
+            ignore_closing_entries=ignore_closing_entries,
+        )
+
+    calculate_values(
+        accounts_by_name,
+        gl_entries_by_account,
+        period_list,
+        accumulated_values,
+        ignore_accumulated_values_for_fy,
     )
 
-    # for both of the trees, extract the leaves and populate gl_entries_by_account
-    for root in accounts_list:
-        set_gl_entries_by_account(company, period_list[0]["year_start_date"] if only_current_fiscal_year else None, period_list[-1]["to_date"], root.lft, root.rgt, filters, gl_entries_by_account, ignore_closing_entries = ignore_closing_entries)
-
-    calculate_values(accounts_by_name, gl_entries_by_account, period_list, accumulated_values, ignore_accumulated_values_for_fy)
     accumulate_values_into_parents(accounts, accounts_by_name, period_list)
     out = prepare_balance_sheet_data(accounts, balance_must_be, period_list, company_currency)
     out = filter_out_zero_value_rows(out, parent_children_map)
@@ -744,12 +734,28 @@ def prepare_balance_sheet_data(accounts, balance_must_be, period_list, company_c
                 has_value = True
                 total += flt(row[period.key])
 
+        if (row.account[-5:] == " - WW"):
+            row.account = (row.account)[:-5]
+
+        if (row.parent_account[-5:] == " - WW"):
+            row.parent_account = (row.parent_account)[:-5]
+
         if (row["is_group"] == False): 
             row["account"] = print_group[0][0]
 
         if (row["account"] == ""):
             row["account"] = row["account_name"]
             
+        if (row["indent"] == 3):
+            row["indent"] = 2
+
+        if (row["parent_account"] == "Accounts Receivable" or
+            row["parent_account"] == "Bank" or
+            row["parent_account"] == "Inventory" or
+            row["parent_account"] == "Other Current Assets"
+        ): row["parent_account"] = "Current Assets"
+
+        row["account"].replace("'", "")
         row["has_value"] = has_value
         row["total"] = total
         row["print_group"] = print_group[0][0]
