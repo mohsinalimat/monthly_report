@@ -84,7 +84,7 @@ frappe.query_reports["Monthly Financial Report"] = {
                     dataset.push(r.message); // push the consolidated dataset to the end
                     report_type = filters.report_type;
                     
-                    show_alert({message: 'Exporting spreadsheet', indicator: 'green'}, 4);
+                    show_alert({message: 'Exporting spreadsheet', indicator: 'blue'}, 4);
                     // finally generate the tables using each cost center dataset
                     generate_tables(dataset, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center);
 
@@ -629,7 +629,7 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
 
             // append Income Taxes
             console.log('income_taxes_global', income_taxes_global);
-            html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
+            // html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
             html += "<tr></tr>";
             
             // subtract taxes from net income and append the Net Income
