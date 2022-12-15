@@ -74,7 +74,7 @@ frappe.query_reports["Monthly Financial Report"] = {
 
             // retrieve the consolidated dataset for all selected cost centers
             frappe.call({
-                method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_report_script.generate_monthly_report',
+                method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_financial_report.generate_monthly_report',
                 args: {filters: filters},
 
                 callback: function (r) {
