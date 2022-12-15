@@ -125,28 +125,34 @@ function generate_tables(dataset, company, month, year, cost_centers) {
 
     // only one cost center was chosen we just populated both spreadsheets with the same data as they are identical
     if (cost_centers.length == 1) { 
-        if (debug_output)
-            console.log(" ### Consolidated ### ");
-
-        // give each table an ID to later identify them in the export function
-        html += generate_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "year_to_date");
-
-        if (report_type == "Regular" || report_type == "Detailed") {
+        if (consolidated_data.length > 0) {
             if (debug_output)
-                console.log(" ### Trailing Twelve Months ### ");
+                console.log(" ### Consolidated ### ");
 
-            $table_id = "table_0";
-            tables_array.push("#" + $table_id);
-            html += generate_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "trailing_12_months");
+            // give each table an ID to later identify them in the export function
+            var $table_id = "consolidated";
+            var tables_array = [("#" + $table_id)];
+            html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "year_to_date");
+
+            if (report_type == "Regular" || report_type == "Detailed") {
+                if (debug_output)
+                    console.log(" ### Trailing Twelve Months ### ");
+
+                $table_id = "table_0";
+                tables_array.push("#" + $table_id);
+                html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "trailing_12_months");
+            }
         }
-        
-        if (debug_output)
-            console.log(" ### Balance Sheet ### ");
 
-        // appends the Balance Sheet
-        $table_id = "balance_sheet";
-        tables_array.push("#" + $table_id);
-        html += generate_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
+        if (balance_sheet_data.length > 0) {
+            if (debug_output)
+                console.log(" ### Balance Sheet ### ");
+
+            // appends the Balance Sheet
+            $table_id = "balance_sheet";
+            tables_array.push("#" + $table_id);
+            html += generate_single_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
+        }
 
     // when there are multiple cost centers we process them differently
     } else { 
@@ -158,7 +164,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
             console.log(" ### Consolidated ### ");
 
         // populate it first with consolidated data as it must always be present
-        html = generate_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "year_to_date");
+        html = generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "year_to_date");
 
         // appends individual cost center income statement sheets
         let id = 0;
@@ -195,7 +201,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
             id++;
             $table_id = "table_" + id;
             tables_array.push("#" + $table_id);
-            html += generate_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "trailing_12_months");
+            html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "trailing_12_months");
 
             id++;
             for (let i = 0; i < cost_centers.length; i++) {
@@ -223,7 +229,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
         // appends the Balance Sheet
         $table_id = "balance_sheet";
         tables_array.push("#" + $table_id);
-        html += generate_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
+        html += generate_single_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
     }
 
     // append the css & html, then export as xls
@@ -234,6 +240,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
     if (download_excel)
         tables_to_excel(tables_array, generate_filename(curr_month_year), generate_tabs(cost_centers));
 }
+
 
 // generates the filename for the downloaded excel file
 function generate_filename(curr_month_year) {
