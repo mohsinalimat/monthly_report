@@ -747,18 +747,19 @@ function get_formatted_date(month, year, offset) {
 
 // formats the arg number such that negative numbers are surrounded by brackets // i.e., -1 to (1)
 function get_formatted_number(number) {
-    var formatted_number = "";
+    if (minus_to_brackets) {
+        var formatted_number = "";
 
-    // check for minus sign and add brackets if found
-    if (number.toString()[0] == "-")
-        formatted_number = "&nbsp;(" + number.toString().slice(1) + ")";
-    else
-        formatted_number = number.toString();
+        // check for minus sign and add brackets if found
+        if (number.toString()[0] == "-")
+            formatted_number = "&nbsp;(" + number.toString().slice(1) + ")";
+        else
+            formatted_number = number.toString();
 
-    if (minus_to_brackets) 
         return formatted_number;
-    else 
+    } else {
         return number;
+    }
 }
 
 // arg must be in the format mmm_yyyy // returns an array containing the current mmm_yyyy and the preceding 11 months
