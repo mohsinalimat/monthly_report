@@ -117,8 +117,8 @@ function generate_tables(dataset, company, month, year, cost_centers) {
     var tables_array = [];
 
     // give each table an ID to later identify them in the export function
-    var $table_id = "consolidated";
-    var tables_array = [("#" + $table_id)];
+    var $table_id = "";
+    var tables_array = [];
 
     // date info needed to generate the tables
     var month_name = (month.slice(0, 3)).toLowerCase();
@@ -133,8 +133,8 @@ function generate_tables(dataset, company, month, year, cost_centers) {
                 console.log(" ### Consolidated ### ");
 
             // give each table an ID to later identify them in the export function
-            var $table_id = "consolidated";
-            var tables_array = [("#" + $table_id)];
+            $table_id = "consolidated";
+            tables_array.push("#" + $table_id);
             html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "year_to_date");
 
             if (report_type == "Regular" || report_type == "Detailed") {
