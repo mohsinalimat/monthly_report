@@ -88,6 +88,8 @@ frappe.query_reports["Monthly Financial Report"] = {
                     // finally generate the tables using each cost center dataset
                     generate_tables(dataset, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center);
 
+                    if (download_success)
+                        show_alert({message: 'Download success', indicator: 'green'}, 5);
                     // refresh the page
                     // location.reload();
                 }
