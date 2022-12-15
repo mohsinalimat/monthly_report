@@ -5,7 +5,7 @@
 
 var minus_to_brackets = 0; // determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
 var download_excel    = 1; // determines if the excel spreadsheet is to be downloaded at the end of processing
-var debug_output      = 0; // determines if console logs should be printed
+var debug_output      = 1; // determines if console logs should be printed
 var skinny_bs_v1      = 0; // swtiches between the two version of balance sheets
 
 
