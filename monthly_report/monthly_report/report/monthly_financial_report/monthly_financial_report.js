@@ -241,7 +241,6 @@ function generate_tables(dataset, company, month, year, cost_centers) {
         tables_to_excel(tables_array, generate_filename(curr_month_year), generate_tabs(cost_centers));
 }
 
-
 // generates the filename for the downloaded excel file
 function generate_filename(curr_month_year) {
     return (curr_month_year + "_" + report_type.toLocaleLowerCase() + '.xls');
@@ -275,7 +274,7 @@ function generate_tabs(cost_centers) {
 }
 
 // shortcut that generates the consolidated table without extra adjustments 
-function generate_table(company, month, year, dataset, curr_month_year, prev_month_year, $table_id, title, mode) {
+function generate_single_table(company, month, year, dataset, curr_month_year, prev_month_year, $table_id, title, mode) {
     // css for the table 
     var html = generate_table_css();
     
