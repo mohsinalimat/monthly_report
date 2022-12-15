@@ -291,7 +291,7 @@ def get_income_statement_data(period_end_month, period_end_year, company, root_t
 
     # extracts the root of the trees "Income" and "Expenses"
     # only two elements in this dict
-    print("\tgetting list of accounts -- income statement [" + root_type + "]")
+    # print("\tgetting list of accounts -- income statement [" + root_type + "]")
     accounts_list = frappe.db.sql(
         """
         SELECT  lft, rgt 
@@ -589,9 +589,10 @@ def get_balance_sheet(filters):
     else:
         data = execute(new_filters)[1]
 
+        lmao = 0
         for row in data:
             if (not row):
-                print()
+                lmao += 1 
             else:
                 if ("Total Asset (Debit)" not in row["account_name"] and
                     "Total Liability (Credit)" not in row["account_name"] and
