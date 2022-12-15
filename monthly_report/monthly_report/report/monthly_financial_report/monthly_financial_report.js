@@ -148,7 +148,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
         }
 
         if (balance_sheet_data.length > 0) {
-            log(balance_sheet_data);
+            console.log(balance_sheet_data);
             if (debug_output)
                 console.log(" ### Balance Sheet ### ");
 
