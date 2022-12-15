@@ -126,7 +126,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
     // only one cost center was chosen we just populated both spreadsheets with the same data as they are identical
     if (cost_centers.length == 1) { 
         if (consolidated_data.length > 0) {
-            console.log(consolidated_data.length);
+            console.log(consolidated_data);
             if (debug_output)
                 console.log(" ### Consolidated ### ");
 
@@ -146,7 +146,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
         }
 
         if (balance_sheet_data.length > 0) {
-            log(balance_sheet_data.length);
+            log(balance_sheet_data);
             if (debug_output)
                 console.log(" ### Balance Sheet ### ");
 
