@@ -6,7 +6,7 @@
 var minus_to_brackets = 0; // determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
 var download_excel    = 1; // determines if the excel spreadsheet is to be downloaded at the end of processing
 var debug_output      = 0; // determines if console logs should be printed
-var skinny_bs_v1      = 1; // swtiches between the two version of balance sheets
+var skinny_bs_v1      = 0; // swtiches between the two version of balance sheets
 
 
 // ============================================================================================================================================
@@ -19,6 +19,7 @@ var indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"; // prints an in
 var total_income_global = [];                                    // holds total values for a category in global scope 
 var income_taxes_global = [];
 var nf = new Intl.NumberFormat('en-US');                         // number format definition
+var download_success = false;
 
 
 // categories in the income statements
@@ -617,6 +618,7 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
             html += append_total_row("Net Income Before Taxes", net_income_before_taxes, mode, true, true);
 
             // append Income Taxes
+            console.log('income_taxes_global', income_taxes_global);
             html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
             html += "<tr></tr>";
             
@@ -747,19 +749,18 @@ function get_formatted_date(month, year, offset) {
 
 // formats the arg number such that negative numbers are surrounded by brackets // i.e., -1 to (1)
 function get_formatted_number(number) {
-    if (minus_to_brackets) {
-        var formatted_number = "";
+    var formatted_number = "";
 
-        // check for minus sign and add brackets if found
-        if (number.toString()[0] == "-")
-            formatted_number = "&nbsp;(" + number.toString().slice(1) + ")";
-        else
-            formatted_number = number.toString();
+    // check for minus sign and add brackets if found
+    if (number.toString()[0] == "-")
+        formatted_number = "&nbsp;(" + number.toString().slice(1) + ")";
+    else
+        formatted_number = number.toString();
 
+    if (minus_to_brackets) 
         return formatted_number;
-    } else {
+    else 
         return number;
-    }
 }
 
 // arg must be in the format mmm_yyyy // returns an array containing the current mmm_yyyy and the preceding 11 months
@@ -880,21 +881,37 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
             // if it does not exist already, append that group to print_groups[] along with its data
             while (dataset[index]["parent_account"] == category_name) {
                 // create an object containing the info and push() to print_groups[]
-                print_groups.push({
-                    "account"   : dataset[index]["account_name"],
-                    "curr_data" : dataset[index][curr_month_year],
-                    "prev_data" : dataset[index][prev_month_year],
-                    "curr_ytd"  : dataset[index]["total"],
-                    "prev_ytd"  : dataset[index]["prev_year_total"],
-                    "indent"    : dataset[index]["indent"],
-                    "is_group"  : dataset[index]["is_group"]
-                });
-                
-                index++;
-                
-                // break the loop if no more rows exist in the source array
-                if (!dataset[index]) 
-                    break;
+                if (category_name == "Other Expenses" && dataset[index]["account"].includes("Income Tax")) {
+                    income_taxes_global = [
+                        dataset[index][curr_month_year],
+                        dataset[index][prev_month_year],
+                        dataset[index]["total"],
+                        dataset[index]["prev_year_total"],
+                    ];
+
+                    index++;
+                    
+                    // break the loop if no more rows exist in the source array
+                    if (!dataset[index]) 
+                        break;
+
+                } else {
+                    print_groups.push({
+                        "account"   : dataset[index]["account_name"],
+                        "curr_data" : dataset[index][curr_month_year],
+                        "prev_data" : dataset[index][prev_month_year],
+                        "curr_ytd"  : dataset[index]["total"],
+                        "prev_ytd"  : dataset[index]["prev_year_total"],
+                        "indent"    : dataset[index]["indent"],
+                        "is_group"  : dataset[index]["is_group"]
+                    });
+                    
+                    index++;
+                    
+                    // break the loop if no more rows exist in the source array
+                    if (!dataset[index]) 
+                        break;
+                }
             }
         } else if (mode == "trailing_12_months") {
             // find the beginning of this category and keep the index
@@ -905,30 +922,55 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
             index++;
 
             while (dataset[index]["parent_account"] == category_name) {
-                print_groups.push({
-                    "account"  : dataset[index]["account_name"],
-                    "ttm_00"   : dataset[index][ttm_period[0]],
-                    "ttm_01"   : dataset[index][ttm_period[1]],
-                    "ttm_02"   : dataset[index][ttm_period[2]],
-                    "ttm_03"   : dataset[index][ttm_period[3]],
-                    "ttm_04"   : dataset[index][ttm_period[4]],
-                    "ttm_05"   : dataset[index][ttm_period[5]],
-                    "ttm_06"   : dataset[index][ttm_period[6]],
-                    "ttm_07"   : dataset[index][ttm_period[7]],
-                    "ttm_08"   : dataset[index][ttm_period[8]],
-                    "ttm_09"   : dataset[index][ttm_period[9]],
-                    "ttm_10"   : dataset[index][ttm_period[10]],
-                    "ttm_11"   : dataset[index][ttm_period[11]],
-                    "total"    : dataset[index]["total"],
-                    "indent"   : dataset[index]["indent"],
-                    "is_group" : dataset[index]["is_group"]
-                });
-                
-                index++;
-                
-                // break the loop if no more rows exist in the source array
-                if (!dataset[index]) 
-                    break;
+                if (category_name == "Other Expenses" && dataset[index]["account"].includes("Income Tax")) {
+                    income_taxes_global = [
+                        dataset[index][ttm_period[0]],
+                        dataset[index][ttm_period[1]],
+                        dataset[index][ttm_period[2]],
+                        dataset[index][ttm_period[3]],
+                        dataset[index][ttm_period[4]],
+                        dataset[index][ttm_period[5]],
+                        dataset[index][ttm_period[6]],
+                        dataset[index][ttm_period[7]],
+                        dataset[index][ttm_period[8]],
+                        dataset[index][ttm_period[9]],
+                        dataset[index][ttm_period[10]],
+                        dataset[index][ttm_period[11]],
+                        dataset[index]["total"],
+                    ];
+
+                    index++;
+                    
+                    // break the loop if no more rows exist in the source array
+                    if (!dataset[index]) 
+                        break;
+
+                } else {
+                    print_groups.push({
+                        "account"  : dataset[index]["account_name"],
+                        "ttm_00"   : dataset[index][ttm_period[0]],
+                        "ttm_01"   : dataset[index][ttm_period[1]],
+                        "ttm_02"   : dataset[index][ttm_period[2]],
+                        "ttm_03"   : dataset[index][ttm_period[3]],
+                        "ttm_04"   : dataset[index][ttm_period[4]],
+                        "ttm_05"   : dataset[index][ttm_period[5]],
+                        "ttm_06"   : dataset[index][ttm_period[6]],
+                        "ttm_07"   : dataset[index][ttm_period[7]],
+                        "ttm_08"   : dataset[index][ttm_period[8]],
+                        "ttm_09"   : dataset[index][ttm_period[9]],
+                        "ttm_10"   : dataset[index][ttm_period[10]],
+                        "ttm_11"   : dataset[index][ttm_period[11]],
+                        "total"    : dataset[index]["total"],
+                        "indent"   : dataset[index]["indent"],
+                        "is_group" : dataset[index]["is_group"]
+                    });
+                    
+                    index++;
+                    
+                    // break the loop if no more rows exist in the source array
+                    if (!dataset[index]) 
+                        break;
+                }
             }
         } else if (mode == "balance_sheet") {
             // find the beginning of this category and keep the index
@@ -961,18 +1003,12 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
             // find the beginning of this category and keep the index
             while (dataset[index]["account"] != category_name && index < dataset.length) 
                 index++;
-
-            // we need to move to the next index because the current index is the header itself
             index++;
 
-            // gather each row's data under the current category
-            // also compresses the accounts based on print groups
-            // if a print group already exists in print_groups[], sum up their values 
-            // if it does not exist already, append that group to print_groups[] along with its data
             while (dataset[index]["parent_account"] == category_name) {
                 account = dataset[index]["account"];
 
-                if (category_name == "Other Expenses" && account.includes("Income Taxes")) {
+                if (category_name == "Other Expenses" && account.includes("Income Tax")) {
                     income_taxes_global = [
                         dataset[index][curr_month_year],
                         dataset[index][prev_month_year],
@@ -1035,7 +1071,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
             while (dataset[index]["parent_account"] == category_name) {
                 account = dataset[index]["account"];
 
-                if (category_name == "Other Expenses" && account.includes("Income Taxes")) {
+                if (category_name == "Other Expenses" && account.includes("Income Tax")) {
                     income_taxes_global = [
                         dataset[index][ttm_period[0]],
                         dataset[index][ttm_period[1]],
@@ -1220,7 +1256,7 @@ function get_category_total(category_name, dataset, curr_month_year, prev_month_
         // everything under this subgroup is summed together into the array
         while (dataset[index]["indent"] == current_indent && index < dataset.length) {
 
-            if (!(exclude_income_taxes && dataset[index]["account"].includes("Taxes"))) {
+            if (!(exclude_income_taxes && dataset[index]["account"].includes("Income Tax"))) {
                 total_values[0] += dataset[index][curr_month_year];
                 total_values[1] += dataset[index][prev_month_year];
                 total_values[2] += dataset[index]["total"];
@@ -1235,7 +1271,7 @@ function get_category_total(category_name, dataset, curr_month_year, prev_month_
     } else if (mode == "trailing_12_months") {
         while (dataset[index]["indent"] == current_indent && index < dataset.length) {
 
-            if (!(exclude_income_taxes && dataset[index]["account"].includes("Income Taxes")))
+            if (!(exclude_income_taxes && dataset[index]["account"].includes("Income Tax")))
                 for (let k = 0; k < total_values.length - 1; k++)
                     total_values[k] += dataset[index][ttm_period[k]];
 
@@ -1365,6 +1401,7 @@ function append_category_rows(category_name, dataset, curr_month_year, prev_mont
                     merged_print_groups[i].prev_ytd
                 ];
     
+                // if (!(account.includes("Income Tax"))) 
                 html += append_data_row(category_total, account, data, mode);
             }
         
@@ -1392,6 +1429,7 @@ function append_category_rows(category_name, dataset, curr_month_year, prev_mont
                 data.push(merged_print_groups[i]["ttm_11"]);
                 data.push(merged_print_groups[i]["total"]);
     
+                // if (!(account.includes("Income Tax")))
                 html += append_data_row(category_total, account, data, mode);
             }
     
@@ -1889,5 +1927,7 @@ Content-Type: text/xml; charset="utf-8"
         document.body.appendChild(link);
         link.click();		
         document.body.removeChild(link);
+
+        download_success = true;
     }
 })();
