@@ -128,7 +128,6 @@ function generate_tables(dataset, company, month, year, cost_centers) {
     // only one cost center was chosen we just populated both spreadsheets with the same data as they are identical
     if (cost_centers.length == 1) { 
         if (consolidated_data.length > 0) {
-            console.log(consolidated_data);
             if (debug_output)
                 console.log(" ### Consolidated ### ");
 
@@ -148,7 +147,6 @@ function generate_tables(dataset, company, month, year, cost_centers) {
         }
 
         if (balance_sheet_data.length > 0) {
-            console.log(balance_sheet_data);
             if (debug_output)
                 console.log(" ### Balance Sheet ### ");
 
@@ -631,7 +629,7 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
 
             // append Income Taxes
             console.log('income_taxes_global', income_taxes_global);
-            // html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
+            html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
             html += "<tr></tr>";
             
             // subtract taxes from net income and append the Net Income

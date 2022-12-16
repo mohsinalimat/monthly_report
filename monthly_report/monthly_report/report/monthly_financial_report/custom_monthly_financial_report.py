@@ -312,11 +312,13 @@ def get_income_statement_data(period_end_month, period_end_year, company, root_t
     out = filter_out_zero_value_rows(out, parent_children_map)
 
     for data in out:
-        if data: 
-            if data.account[-5:] == " - WW":
-                data.account = (data.account)[:-5]
-            if data.parent_account[-5:] == " - WW":
-                data.parent_account = (data.parent_account)[:-5]
+        if data:
+            if data.account: 
+                if data.account[-5:] == " - WW":
+                    data.account = (data.account)[:-5]
+            if data.parent_account:
+                if data.parent_account[-5:] == " - WW":
+                    data.parent_account = (data.parent_account)[:-5]
 
     return out
 
@@ -594,19 +596,23 @@ def get_balance_sheet(filters):
             if (not row):
                 lmao += 1 
             else:
-                if ("Total Asset (Debit)"                not in row["account_name"] and
-                    "Total Liability (Credit)"           not in row["account_name"] and
-                    "Provisional Profit / Loss (Credit)" not in row["account_name"] and
-                    "Total (Credit)"                     not in row["account_name"] and 
-                    "Total Equity (Credit)"              not in row["account_name"]
-                ):
+                # if ("Total Asset (Debit)"                not in row["account_name"] and
+                #     "Total Liability (Credit)"           not in row["account_name"] and
+                #     "Provisional Profit / Loss (Credit)" not in row["account_name"] and
+                #     "Total (Credit)"                     not in row["account_name"] and 
+                #     "Total Equity (Credit)"              not in row["account_name"]
+                # ):
+
+                if ("account_name" in row and "parent_account" in row):
                     print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", row["account"])
+                    print(row["account_name"] + " --> ", print_group[0][0])
 
                     if print_group:
                         row["print_group"] = print_group[0][0]
 
-                    if (row["account"][-5:] == " - WW"):
-                        row["account"] = (row["account"])[:-5]
+                    if (row["account"]):
+                        if (row["account"][-5:] == " - WW"):
+                            row["account"] = (row["account"])[:-5]
 
                     if (row["parent_account"][-5:] == " - WW"):
                         row["parent_account"] = (row["parent_account"])[:-5]
