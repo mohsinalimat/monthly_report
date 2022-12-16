@@ -594,10 +594,11 @@ def get_balance_sheet(filters):
             if (not row):
                 lmao += 1 
             else:
-                if ("Total Asset (Debit)" not in row["account_name"] and
-                    "Total Liability (Credit)" not in row["account_name"] and
+                if ("Total Asset (Debit)"                not in row["account_name"] and
+                    "Total Liability (Credit)"           not in row["account_name"] and
                     "Provisional Profit / Loss (Credit)" not in row["account_name"] and
-                    "Total (Credit)" not in row["account_name"]
+                    "Total (Credit)"                     not in row["account_name"] and 
+                    "Total Equity (Credit)"              not in row["account_name"]
                 ):
                     print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", row["account"])
 
