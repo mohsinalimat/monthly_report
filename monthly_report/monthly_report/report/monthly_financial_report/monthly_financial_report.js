@@ -242,7 +242,7 @@ function generate_tables(dataset, company, month, year, cost_centers) {
 
     // flags to control the export and download -- used for testing without filling the downloads folder with junk
     if (download_excel)
-        tables_to_excel(tables_array, generate_filename(curr_month_year), generate_tabs(cost_centers));
+        tables_to_excel(tables_array, generate_filename(curr_month_year), generate_tabs(cost_centers, consolidated_data));
 }
 
 // generates the filename for the downloaded excel file
@@ -251,24 +251,26 @@ function generate_filename(curr_month_year) {
 }
 
 // creates tabs based on the cost centers selected in the filters
-function generate_tabs(cost_centers) {
+function generate_tabs(cost_centers, consolidated_data) {
     var center_numbers = [];
 
-    // process the cost center numbers to creat the excel sheet names on the tabs
-    // append the *Income Statement* numbers to the list of cost centers
-    if (cost_centers.length > 1) 
-        center_numbers.push("0_IS");
-
-    for (let i = 0; i < cost_centers.length; i++)
-        center_numbers.push(cost_centers[i].slice(1, 2) + "_IS");
-
-    // append the *Trailing 12 Months* numbers to the list of cost centers
-    if (report_type != "Skinny") {
+    if (consolidated_data.length > 0) {
+        // process the cost center numbers to creat the excel sheet names on the tabs
+        // append the *Income Statement* numbers to the list of cost centers
         if (cost_centers.length > 1) 
-            center_numbers.push("0_TTM");
-
+            center_numbers.push("0_IS");
+    
         for (let i = 0; i < cost_centers.length; i++)
-            center_numbers.push(cost_centers[i].slice(1, 2) + "_TTM");
+            center_numbers.push(cost_centers[i].slice(1, 2) + "_IS");
+    
+        // append the *Trailing 12 Months* numbers to the list of cost centers
+        if (report_type != "Skinny") {
+            if (cost_centers.length > 1) 
+                center_numbers.push("0_TTM");
+    
+            for (let i = 0; i < cost_centers.length; i++)
+                center_numbers.push(cost_centers[i].slice(1, 2) + "_TTM");
+        }
     }
 
     // append the *Balance Sheet* number
