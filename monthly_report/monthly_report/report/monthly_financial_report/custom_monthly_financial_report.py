@@ -2,7 +2,7 @@
 
 import frappe, calendar, copy, datetime, json
 
-from frappe import _, qb, scrub
+from frappe import _, qb, scrub, publish_progress
 from frappe.query_builder import CustomFunction
 from frappe.query_builder.functions import Max
 from frappe.utils import date_diff, flt, getdate, cint, flt
@@ -105,7 +105,6 @@ def generate_monthly_report(filters):
         dataset.append(cost_center_data[0])
         dataset.append(cost_center_data[1])
 
-    
     print("Dataset returned")
     return dataset
 

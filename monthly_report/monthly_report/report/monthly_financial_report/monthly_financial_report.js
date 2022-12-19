@@ -44,7 +44,7 @@ frappe.query_reports["Monthly Financial Report"] = {
     "filters": [
         {"fieldname": 'company',          "label": "Company",         "fieldtype": 'Link',   "reqd": false, "hidden": true,  "default": frappe.defaults.get_user_default('company'),     "options": 'Company'},
         {"fieldname": "finance_book",     "label": "Finance Book",    "fieldtype": "Link",   "reqd": false, "hidden": true,                                                              "options": "Finance Book"},
-        {"fieldname": "to_fiscal_year",   "label": "End Year",        "fieldtype": "Link",   "reqd": true,  "hidden": false, "default": frappe.defaults.get_user_default("fiscal_year")-1, "options": "Fiscal Year", "depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"},
+        {"fieldname": "to_fiscal_year",   "label": "End Year",        "fieldtype": "Link",   "reqd": true,  "hidden": false, "default": frappe.defaults.get_user_default("fiscal_year"), "options": "Fiscal Year", "depends_on": "eval:doc.filter_based_on == 'Fiscal Year'"},
         {"fieldname": "period_end_month", "label": "Month",           "fieldtype": "Select", "reqd": true,  "hidden": false, "default": "January", "mandatory": 0, "wildcard_filter": 0, "options": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]},
         {"fieldname": "periodicity",      "label": "Periodicity",     "fieldtype": "Select", "reqd": true,  "hidden": true,  "default": "Monthly",                                       "options": [{ "value": "Monthly", "label": __("Monthly") }]},
         {"fieldname": "filter_based_on",  "label": "Filter Based On", "fieldtype": "Select", "reqd": true,  "hidden": true,  "default": ["Fiscal Year"],                                 "options": ["Fiscal Year", "Date Range"]},
@@ -64,15 +64,15 @@ frappe.query_reports["Monthly Financial Report"] = {
             // filters.cost_center = [
                 // '01 - White-Wood Corporate - WW',
                 // '02 - White-Wood Distributors Winnipeg - WW',
-            //     '03 - Forest Products - WW',
-            //     '06 - Endeavours - WW',
+                // '03 - Forest Products - WW',
+                // '06 - Endeavours - WW',
             // ];
             // ------------- for testing, make sure this is commented out -------------
 
             // an array to store the consolidated, followed by each cost center's data
             var dataset = [];
 
-            show_alert({message: 'Retrieving data for ' + filters.cost_center.length + ' cost centers', indicator: 'blue'}, (filters.cost_center.length*8));
+            show_alert({message: 'Retrieving data for ' + filters.cost_center.length + ' cost centers', indicator: 'blue'}, (filters.cost_center.length*15));
 
             // retrieve the consolidated dataset for all selected cost centers
             frappe.call({
@@ -91,6 +91,7 @@ frappe.query_reports["Monthly Financial Report"] = {
 
                     if (download_success)
                         show_alert({message: 'Download success', indicator: 'green'}, 5);
+
                     // refresh the page
                     // location.reload();
                 }
@@ -1721,14 +1722,23 @@ function append_cogs_section(dataset, curr_month_year, prev_month_year, mode) {
                 dataset[i]["total"],
                 dataset[i]["prev_year_total"]
             ];
+
             break;
         }
     }
+    
+    console.log('total_income', total_income);
 
     for (let i = 0; i < 4; i++) {
         gross_profit_global.push(total_income[i] - total_cogs[i]);
-        percentages.push((total_income[i] - total_cogs[i])*100 / total_income[i])
-        cogs_percentages.push((100 - percentages[0]))
+
+        if (total_income[i] == 0) {
+            percentages.push(0);
+            cogs_percentages.push(0);
+        } else {
+            percentages.push(((gross_profit_global[i]) / total_income[i]) * 100);
+            cogs_percentages.push((total_cogs[i] / total_income[i]) * 100);
+        }
     }
 
     for (let i = 0; i < 4; i++) {
@@ -1803,11 +1813,9 @@ function append_cogs_section(dataset, curr_month_year, prev_month_year, mode) {
             for (let i = 0; i < total_cogs.length; i++)
                 gross_profit_global.push(total_income[i] - total_cogs[i]);
 
+            percentages = [((gross_profit_global[12]/total_income[12]) * 100) + "%"];
             cogs_percentages = [((total_cogs[12]/total_income[12]) * 100) + "%"];
 
-            percentages = [((gross_profit_global[12]/total_income[12]) * 100) + "%"];
-            
-            
             html += '<tr>';
             html += '<td class="table-data-right" style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
             for (let i = 0; i < total_cogs.length; i++)
