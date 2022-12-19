@@ -100,7 +100,7 @@ def generate_monthly_report(filters):
 
     # generate each cost center data
     for each_center in filters.cost_center:
-        print("Getting data for " + each_center)
+        print("Getting data for " + each_center.split(" ")[0])
         cost_center_data = get_cost_center_data(filters, period, each_center)
         dataset.append(cost_center_data[0])
         dataset.append(cost_center_data[1])
@@ -605,7 +605,6 @@ def get_balance_sheet(filters):
 
                 if ("account_name" in row and "parent_account" in row):
                     print_group = frappe.db.sql("""SELECT print_group FROM tabAccount WHERE name = %s""", row["account"])
-                    print(row["account_name"] + " --> ", print_group[0][0])
 
                     if print_group:
                         row["print_group"] = print_group[0][0]
