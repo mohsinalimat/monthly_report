@@ -93,7 +93,7 @@ frappe.query_reports["Monthly Financial Report"] = {
 
 
 function gather_data(curr_thing_to_query = 0) {
-    let things_to_query = ['Consolidated'];
+    let things_to_query = ['Consolidated', 'Balance Sheet'];
     for (let i = 0; i < filters.cost_center.length; i++) 
         things_to_query.push(filters.cost_center[i]);
 
@@ -1130,8 +1130,12 @@ function get_merged_print_groups(category_name, dataset, mode) {
             }
         } else if (mode == "balance_sheet") {
             // find the beginning of this category and keep the index
-            while (dataset[index]["account"] != category_name && index < dataset.length)
+            // while (dataset[index]["account"] != category_name && index < dataset.length)
+            //     index++;
+
+            while ((dataset[index]["account"]) && (dataset[index]["account"] != category_name) && (index < dataset.length))
                 index++;
+
 
             // we need to move to the next index because the current index is the header itself
             index++;
