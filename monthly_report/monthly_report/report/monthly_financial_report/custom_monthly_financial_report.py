@@ -29,7 +29,7 @@ def run_queries(filters, cost_center_name = ""):
     if (cost_center_name == "Consolidated"):
         return run_consolidated_query(filters)
     elif (cost_center_name == "Balance Sheet"):
-        return #run_balance_sheet_query(filters)
+        return run_balance_sheet_query(filters)
     else:
         return run_cost_center_query(filters, cost_center_name)
 

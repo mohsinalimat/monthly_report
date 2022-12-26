@@ -93,7 +93,7 @@ frappe.query_reports["Monthly Financial Report"] = {
 
 
 function gather_data(curr_thing_to_query = 0) {
-    let things_to_query = ['Consolidated', 'Balance Sheet'];
+    let things_to_query = ['Consolidated'];
     for (let i = 0; i < filters.cost_center.length; i++) 
         things_to_query.push(filters.cost_center[i]);
 
