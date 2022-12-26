@@ -86,12 +86,7 @@ frappe.query_reports["Monthly Financial Report"] = {
     },
 }
 
-
-// ============================================================================================================================================
-// GENERATOR FUNCTIONS
-// ============================================================================================================================================
-
-
+//
 function gather_data(curr_thing_to_query = 0) {
     let things_to_query = ['Consolidated', 'Balance Sheet'];
     for (let i = 0; i < filters.cost_center.length; i++) 
@@ -123,6 +118,38 @@ function gather_data(curr_thing_to_query = 0) {
     }
 }
 
+//
+function remove_blank_entires(dirty_dataset) {
+    clean_dataset = [];
+
+    for (let i = 0; i < dirty_dataset.length; i++) {
+        if (dirty_dataset[i]['account']) {
+            clean_dataset.push(dirty_dataset[i]);
+        }
+    }
+
+    return clean_dataset;
+}
+
+// initiates global variables
+function init_globals() {
+    // date info needed to generate the tables
+    month_name = (filters.period_end_month.slice(0, 3)).toLowerCase();
+    curr_month_year = month_name + "_" + filters.to_fiscal_year;
+    prev_month_year = month_name + "_" + (parseInt(filters.to_fiscal_year) - 1).toString();
+
+
+    ttm_period = get_ttm_period(curr_month_year);
+    tables_array = [];
+    id = 0; 
+}
+
+
+// ============================================================================================================================================
+// GENERATOR FUNCTIONS
+// ============================================================================================================================================
+
+
 // generates the entire table by calling functions that generate the css, caption, header, and body
 function generate_report(dataset) {
     console.log(dataset);
@@ -139,19 +166,6 @@ function generate_report(dataset) {
 
     // flags to control the export and download -- used for testing without filling the downloads folder with junk
     download_excel ? tables_to_excel(tables_array, generate_filename(), generate_tabs(dataset)) : console.log("Download flag is set to false"); ;
-}
-
-// initiates global variables
-function init_globals() {
-    // date info needed to generate the tables
-    month_name = (filters.period_end_month.slice(0, 3)).toLowerCase();
-    curr_month_year = month_name + "_" + filters.to_fiscal_year;
-    prev_month_year = month_name + "_" + (parseInt(filters.to_fiscal_year) - 1).toString();
-
-
-    ttm_period = get_ttm_period(curr_month_year);
-    tables_array = [];
-    id = 0; 
 }
 
 // generates year to date sheets 
@@ -1130,12 +1144,8 @@ function get_merged_print_groups(category_name, dataset, mode) {
             }
         } else if (mode == "balance_sheet") {
             // find the beginning of this category and keep the index
-            // while (dataset[index]["account"] != category_name && index < dataset.length)
-            //     index++;
-
-            while ((dataset[index]["account"]) && (dataset[index]["account"] != category_name) && (index < dataset.length))
+            while (dataset[index]["account"] != category_name && index < dataset.length)
                 index++;
-
 
             // we need to move to the next index because the current index is the header itself
             index++;
@@ -1226,7 +1236,7 @@ function get_category_total(category_name, dataset, mode, exclude_income_taxes =
     var index = 0;
     
     // find the beginning of this category and keep the index
-    while ((dataset[index]["account"]) && (dataset[index]["account"] != category_name) && (index < dataset.length)) 
+    while (dataset[index]["account"] != category_name && index < dataset.length) 
         index++;
     index++;
 
