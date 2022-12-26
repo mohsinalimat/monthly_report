@@ -1142,9 +1142,13 @@ function get_merged_print_groups(category_name, dataset, mode) {
             }
         } else if (mode == "balance_sheet") {
             // find the beginning of this category and keep the index
-            while (dataset[index]["account"] != category_name && index < dataset.length)
+            try {
+                while (dataset[index]["account"] != category_name && index < dataset.length)
                 index++;
-
+            } catch(err) {
+                console.log(dataset[index]);
+            }
+           
             // we need to move to the next index because the current index is the header itself
             index++;
 
