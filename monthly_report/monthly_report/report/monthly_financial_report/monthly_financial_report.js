@@ -51,7 +51,7 @@ const income_statement_categories = [
 
 // categories in the balance sheets
 const balance_sheet_categories = [
-    "Current Assets", "Fixed Asset", // assets
+    "Current Assets", "Fixed Assets", // assets
     "Accounts Payable", "Current Liabilities", "Duties and Taxes", "Long-Term Liabilities" // liabilities
 ];
 
@@ -78,6 +78,10 @@ frappe.query_reports["Monthly Financial Report"] = {
 
             _start_time = new Date();
 
+            if (!filters.period_end_month)
+                frappe.throw('Please select an ending month');
+            if (!filters.to_fiscal_year)
+                frappe.throw('Please select an ending year');
             if (filters.cost_center.length == 0)
                 frappe.throw('Please select at least one cost center');
 
@@ -130,7 +134,7 @@ function remove_blank_entires(dirty_dataset) {
 }
 
 // initiates global variables
-function init_globals() {
+function init_globals(dataset) {
     // date info needed to generate the tables
     month_name = (filters.period_end_month.slice(0, 3)).toLowerCase();
     curr_month_year = month_name + "_" + filters.to_fiscal_year;
@@ -140,6 +144,19 @@ function init_globals() {
     ttm_period = get_ttm_period(curr_month_year);
     tables_array = [];
     id = 0; 
+
+    console.log("---------- consolidated ----------");
+    get_category_names(dataset[0][1]);
+    console.log("---------- balancesheet ----------");
+    get_category_names(dataset[0][3]);
+
+}
+
+//
+function get_category_names(dataset) {
+    for (let i = 0; i < dataset.length; i++)
+        if (dataset[i]['indent'] == 1)
+            console.log(dataset[i]['account']); 
 }
 
 
@@ -151,7 +168,7 @@ function init_globals() {
 // generates the entire table by calling functions that generate the css, caption, header, and body
 function generate_report(dataset) {
     console.log(dataset);
-    init_globals();
+    init_globals(dataset);
 
     var html = "";
     html += generate_ytd_tables(dataset); // generates year to date sheets 
@@ -1142,13 +1159,9 @@ function get_merged_print_groups(category_name, dataset, mode) {
             }
         } else if (mode == "balance_sheet") {
             // find the beginning of this category and keep the index
-            try {
-                while (dataset[index]["account"] != category_name && index < dataset.length)
-                    index++;
-            } catch(err) {
-                console.log("Error searching for " + category_name + " -> index " + index);
-            }
-           
+            while (dataset[index]["account"] != category_name && index < dataset.length)
+                index++;
+
             // we need to move to the next index because the current index is the header itself
             index++;
 
@@ -1912,5 +1925,3 @@ Content-Type: text/xml; charset="utf-8"
         download_success = true;
     }
 })();
-
-//
