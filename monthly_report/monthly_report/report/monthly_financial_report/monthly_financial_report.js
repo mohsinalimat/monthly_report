@@ -1226,7 +1226,7 @@ function get_category_total(category_name, dataset, mode, exclude_income_taxes =
     var index = 0;
     
     // find the beginning of this category and keep the index
-    while (dataset[index]["account"] != category_name && index < dataset.length) 
+    while ((dataset[index]["account"]) && (dataset[index]["account"] != category_name) && (index < dataset.length)) 
         index++;
     index++;
 
