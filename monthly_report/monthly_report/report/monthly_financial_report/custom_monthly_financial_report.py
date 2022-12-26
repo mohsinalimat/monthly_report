@@ -36,6 +36,11 @@ def run_queries(filters, cost_center_name = ""):
 
 ## 
 def run_balance_sheet_query(filters):
+    global balance_sheet_start_date
+    global balance_sheet_end_date
+    
+    balance_sheet_start_date = get_year_start_date(filters.to_fiscal_year, filters.period_end_month)
+    balance_sheet_end_date = get_year_end_date(filters.to_fiscal_year, filters.period_end_month)
     dataset = []
 
     # generate the balance sheet
@@ -195,9 +200,9 @@ def get_year_start_date(to_fiscal_year, period_end_month):
     else:
         year_start_date = getdate(fiscal_year.year_start_date)
 
-    balance_sheet_year  = str(int(fiscal_year.year_start_date.strftime("%Y"))+1)
-    balance_sheet_month = str(fiscal_year.year_start_date.strftime("%m"))
-    balance_sheet_date  = str(fiscal_year.year_start_date.strftime("%d"))
+    # balance_sheet_year  = str(int(fiscal_year.year_start_date.strftime("%Y"))+1)
+    # balance_sheet_month = str(fiscal_year.year_start_date.strftime("%m"))
+    # balance_sheet_date  = str(fiscal_year.year_start_date.strftime("%d"))
 
     # global balance_sheet_start_date
     # balance_sheet_start_date = balance_sheet_year + "-" + balance_sheet_month + "-" + balance_sheet_date
