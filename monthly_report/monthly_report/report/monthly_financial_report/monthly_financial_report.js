@@ -2,7 +2,6 @@
 // GLOBAL FLAGS
 // ============================================================================================================================================
 
-
 var minus_to_brackets = 0; // determines if negative numbers are to be represented with brackets instead: i.e., -1 to (1)
 var download_excel    = 1; // determines if the excel spreadsheet is to be downloaded at the end of processing
 var debug_output      = 0; // determines if console logs should be printed
@@ -14,14 +13,35 @@ var skinny_bs_v1      = 0; // swtiches between the two version of balance sheets
 // ============================================================================================================================================
 
 
-var report_type = "";                                            // determines the type of report that will be generated // updated in frappe.query_reports[] based on filters
-var indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"; // prints an indent of 8 spaces
-var total_income_global = [];                                    // holds total values for a category in global scope 
-var income_taxes_global = [];
-var gross_profit_global = [];
-var nf = new Intl.NumberFormat('en-US');                         // number format definition
+var indent = "&nbsp;&nbsp;&nbsp;&nbsp;"; // prints an indent of 4 spaces
+
+var _start_time;
+var _dataset = [];
+var filters = [];
+var month_name = "";
+var curr_month_year = "";
+var prev_month_year = "";
+
+var global_total_income = []; // holds total values for a category in global scope 
+var global_income_taxes = [];
+var global_gross_profit = [];
+var ttm_period = [];
+
+// give each table an ID to later identify them in the export function
+var tables_array = [];
+var id = 0;
+
+var nf = new Intl.NumberFormat('en-US'); // number format definition
 var download_success = false;
 
+const validate_number = (number) => {
+    if (number.includes("NaN") || number.includes("100.00") || number.includes("Infinity"))
+        return "100%";
+    else if (number.toString().slice(0, -1) == "0.00")
+        return "0%";
+    else
+        return number;
+}
 
 // categories in the income statements
 const income_statement_categories = [
@@ -54,48 +74,14 @@ frappe.query_reports["Monthly Financial Report"] = {
 
     onload: function(report) {
         report.page.add_inner_button(__("Export Report"), function () {
-            let filters = report.get_values();
+            filters = report.get_values();
 
-            // ------------- for testing, make sure this is commented out -------------
-            // filters.report_type = "Regular";
-            // filters.report_type = "Skinny";
-            // filters.report_type = "Detailed";
-        
-            // filters.cost_center = [
-                // '01 - White-Wood Corporate - WW',
-                // '02 - White-Wood Distributors Winnipeg - WW',
-                // '03 - Forest Products - WW',
-                // '06 - Endeavours - WW',
-            // ];
-            // ------------- for testing, make sure this is commented out -------------
+            _start_time = new Date();
 
-            // an array to store the consolidated, followed by each cost center's data
-            var dataset = [];
+            if (filters.cost_center.length == 0)
+                frappe.throw('Please select at least one cost center');
 
-            show_alert({message: 'Retrieving data for ' + filters.cost_center.length + ' cost centers', indicator: 'blue'}, (filters.cost_center.length*15));
-
-            // retrieve the consolidated dataset for all selected cost centers
-            frappe.call({
-                method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_financial_report.generate_monthly_report',
-                args: {filters: filters},
-
-                callback: function (r) {
-                    // filters = report.get_values();
-
-                    dataset.push(r.message); // push the consolidated dataset to the end
-                    report_type = filters.report_type;
-                    
-                    show_alert({message: 'Exporting spreadsheet', indicator: 'blue'}, 4);
-                    // finally generate the tables using each cost center dataset
-                    generate_tables(dataset, filters.company, filters.period_end_month, filters.to_fiscal_year, filters.cost_center);
-
-                    if (download_success)
-                        show_alert({message: 'Download success', indicator: 'green'}, 5);
-
-                    // refresh the page
-                    // location.reload();
-                }
-            });
+            gather_data();
         });
     },
 }
@@ -106,170 +92,148 @@ frappe.query_reports["Monthly Financial Report"] = {
 // ============================================================================================================================================
 
 
-// generates the entire table by calling functions that generate the css, caption, header, and body
-function generate_tables(dataset, company, month, year, cost_centers) {
-    console.log(dataset);
+function gather_data(curr_thing_to_query = 0) {
+    let things_to_query = ['Consolidated', 'Balance Sheet'];
+    for (let i = 0; i < filters.cost_center.length; i++) 
+        things_to_query.push(filters.cost_center[i]);
 
-    // dataset[0][1], dataset[0][1] contains the consolidated and balance sheet data respectively
-    var consolidated_data = dataset[0][1];
-    var balance_sheet_data = dataset[0][3];
+    if (curr_thing_to_query < things_to_query.length) {
+		frappe.show_progress('Generating Report', curr_thing_to_query, things_to_query.length, `Gathering data: ${things_to_query[curr_thing_to_query]}`);
+
+        frappe.call({
+			method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_financial_report.run_queries',
+			args: {filters: filters, cost_center_name: things_to_query[curr_thing_to_query]},
+
+			callback: function (r) {
+				_dataset.push(r.message[0]);
+				_dataset.push(r.message[1]);
+				gather_data(++curr_thing_to_query);
+			}
+        })
+    } else {
+        generate_report([_dataset]);
+
+        // Total execution time for display
+		var total_time = ((new Date()).getTime() - _start_time.getTime()) / 1000;
+		var minutes = Math.floor(total_time / 60);
+		var seconds = Math.round(total_time - (minutes * 60));
+		var display_time = (minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} and ` : '') + `${seconds} second${seconds != 1 ? 's' : ''}`;
+
+		frappe.show_progress('Generating Report', 1, 1, `Completed in ${display_time}`);
+    }
+}
+
+// generates the entire table by calling functions that generate the css, caption, header, and body
+function generate_report(dataset) {
+    console.log(dataset);
+    init_globals();
 
     var html = "";
-    var $table_id = "";
-    var tables_array = [];
-
-    // give each table an ID to later identify them in the export function
-    var $table_id = "";
-    var tables_array = [];
-
-    // date info needed to generate the tables
-    var month_name = (month.slice(0, 3)).toLowerCase();
-    var curr_month_year = month_name + "_" + year;
-    var prev_month_year = month_name + "_" + (parseInt(year) - 1).toString();
-
-    // only one cost center was chosen we just populated both spreadsheets with the same data as they are identical
-    if (cost_centers.length == 1) { 
-        if (consolidated_data.length > 0) {
-            if (debug_output)
-                console.log(" ### Consolidated ### ");
-
-            // give each table an ID to later identify them in the export function
-            $table_id = "consolidated";
-            tables_array.push("#" + $table_id);
-            html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "year_to_date");
-
-            if (report_type == "Regular" || report_type == "Detailed") {
-                if (debug_output)
-                    console.log(" ### Trailing Twelve Months ### ");
-
-                $table_id = "table_0";
-                tables_array.push("#" + $table_id);
-                html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, (cost_centers[0].slice(5, -5) + " Income Statement"), mode = "trailing_12_months");
-            }
-        }
-
-        if (balance_sheet_data.length > 0) {
-            if (debug_output)
-                console.log(" ### Balance Sheet ### ");
-
-            // appends the Balance Sheet
-            $table_id = "balance_sheet";
-            tables_array.push("#" + $table_id);
-            html += generate_single_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
-        }
-
-    // when there are multiple cost centers we process them differently
-    } else { 
-        // give each table an ID to later identify them in the export function
-        $table_id = "consolidated";
-        tables_array = [("#" + $table_id)];
-        
-        if (debug_output)
-            console.log(" ### Consolidated ### ");
-
-        // populate it first with consolidated data as it must always be present
-        html = generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "year_to_date");
-
-        // appends individual cost center income statement sheets
-        let id = 0;
-
-        for (let i = 0; i < cost_centers.length; i++) {
-            if (debug_output)
-                console.log(" ### Table " + id + " ### ");
-
-            $table_id = "table_" + id;
-            tables_array.push("#" + $table_id);
-    
-            html += '<div id="data">';
-            html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-            html += generate_table_caption(company, month, year, (cost_centers[i].slice(5, -5) + " Income Statement"));
-            html += generate_table_head(month, year, mode = "year_to_date");
-
-            // [0][j][0]["dataset_for"] contains the cost center name 
-            // I used that to cross check and populate the sheet so that none of the data gets swapped across different tabs
-            // i.e., tab named Endeavours might contain Forest's data otherwirse since Javascript is asynchronous
-            for (let j = 0; j < dataset[0].length; j++)
-                if (dataset[0][j][0]["dataset_for"] === cost_centers[i])
-                    html += generate_table_body(dataset[0][j+1], curr_month_year, prev_month_year, mode = "year_to_date");
-
-            html += '</table>';
-            html += '</div>';
-            id++;
-        }
-
-        if (report_type != "Skinny") {
-            if (debug_output)
-                console.log(" ### Trailing Twelve Months ### ");
-
-            // appends the Trailing Twelve Months sheets
-            id++;
-            $table_id = "table_" + id;
-            tables_array.push("#" + $table_id);
-            html += generate_single_table(company, month, year, consolidated_data, curr_month_year, prev_month_year, $table_id, "Consolidated Income Statement", mode = "trailing_12_months");
-
-            id++;
-            for (let i = 0; i < cost_centers.length; i++) {
-                $table_id = "table_" + id;
-                tables_array.push("#" + $table_id);
-
-                html += '<div id="data">';
-                html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-                html += generate_table_caption(company, month, year, (cost_centers[i].slice(5, -5) + " Income Statement"));
-                html += generate_table_head(month, year, mode);
-
-                for (let j = 1; j < dataset[0].length; j++)
-                    if (dataset[0][j][0]["dataset_for"] === cost_centers[i])
-                        html += generate_table_body(dataset[0][j+1], curr_month_year, prev_month_year, mode = "trailing_12_months");
-
-                html += '</table>';
-                html += '</div>';
-                id++;
-            }
-        }
-
-        if (debug_output)
-            console.log(" ### Balance Sheet ### ");
-
-        // appends the Balance Sheet
-        $table_id = "balance_sheet";
-        tables_array.push("#" + $table_id);
-        html += generate_single_table(company, month, year, balance_sheet_data, curr_month_year, prev_month_year, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
-    }
+    html += generate_ytd_tables(dataset); // generates year to date sheets 
+    html += generate_ttm_tables(dataset); // generates trailing twelve months sheets
+    html += generate_bal_tables(dataset); // generates balance sheets
 
     // append the css & html, then export as xls
     $(".report-wrapper").hide();
     $(".report-wrapper").append(html);
 
     // flags to control the export and download -- used for testing without filling the downloads folder with junk
-    if (download_excel)
-        tables_to_excel(tables_array, generate_filename(curr_month_year), generate_tabs(cost_centers, consolidated_data));
+    download_excel ? tables_to_excel(tables_array, generate_filename(), generate_tabs(dataset)) : console.log("Download flag is set to false"); ;
+}
+
+// initiates global variables
+function init_globals() {
+    // date info needed to generate the tables
+    month_name = (filters.period_end_month.slice(0, 3)).toLowerCase();
+    curr_month_year = month_name + "_" + filters.to_fiscal_year;
+    prev_month_year = month_name + "_" + (parseInt(filters.to_fiscal_year) - 1).toString();
+
+
+    ttm_period = get_ttm_period(curr_month_year);
+    tables_array = [];
+    id = 0; 
+}
+
+// generates year to date sheets 
+function generate_ytd_tables(dataset) {
+    let html = "";
+    let consolidated_data = dataset[0][1];
+    let mode = "year_to_date";
+
+    // populate it first with consolidated sheet
+    let $table_id = "consolidated_ytd";
+    tables_array.push("#" + $table_id);
+    html += generate_single_table(consolidated_data, $table_id, "Consolidated Income Statement", mode);
+    
+    if (filters.cost_center.length > 1) {
+        // appends individual cost center income statement sheets
+        for (let i = 0; i < filters.cost_center.length; i++)
+            html += generate_per_cost_center(dataset, filters.cost_center[i], mode);
+    }
+    return html;
+}
+
+// generates trailing twelve months sheets
+function generate_ttm_tables(dataset) {
+    let html = "";
+    let consolidated_data = dataset[0][1];
+    let mode = "trailing_12_months";
+
+    if (filters.report_type != "Skinny") {
+        // appends the Trailing Twelve Months sheets
+        let $table_id = "consolidated_ttm";
+        tables_array.push("#" + $table_id);
+        html += generate_single_table(consolidated_data, $table_id, "Consolidated Income Statement", mode);
+
+        if (filters.cost_center.length > 1) {
+            id++;
+            for (let i = 0; i < filters.cost_center.length; i++)
+                html += generate_per_cost_center(dataset, filters.cost_center[i], mode);
+        }
+    }
+
+    return html;
+}
+
+// generates balance sheets
+function generate_bal_tables(dataset) {
+    let html = "";
+    let balance_sheet_data = dataset[0][3];
+
+    // appends the Balance Sheet
+    let $table_id = "balance_sheet";
+    tables_array.push("#" + $table_id);
+    html += generate_single_table(balance_sheet_data, $table_id, "Consolidated Balance Sheet", mode = "balance_sheet");
+
+    return html;
 }
 
 // generates the filename for the downloaded excel file
-function generate_filename(curr_month_year) {
-    return (curr_month_year + "_" + report_type.toLocaleLowerCase() + '.xls');
+function generate_filename() {
+    return (curr_month_year + "_" + (filters.report_type).toLowerCase() + '.xls');
 }
 
 // creates tabs based on the cost centers selected in the filters
-function generate_tabs(cost_centers, consolidated_data) {
+function generate_tabs(dataset) {
     var center_numbers = [];
+    let consolidated_data = dataset[0][1];
 
     if (consolidated_data.length > 0) {
         // process the cost center numbers to creat the excel sheet names on the tabs
         // append the *Income Statement* numbers to the list of cost centers
-        if (cost_centers.length > 1) 
+        if (filters.cost_center.length > 1) 
             center_numbers.push("0_IS");
     
-        for (let i = 0; i < cost_centers.length; i++)
-            center_numbers.push(cost_centers[i].slice(1, 2) + "_IS");
+        for (let i = 0; i < filters.cost_center.length; i++)
+            center_numbers.push(filters.cost_center[i].slice(1, 2) + "_IS");
     
         // append the *Trailing 12 Months* numbers to the list of cost centers
-        if (report_type != "Skinny") {
-            if (cost_centers.length > 1) 
+        if (filters.report_type != "Skinny") {
+            if (filters.cost_center.length > 1) 
                 center_numbers.push("0_TTM");
     
-            for (let i = 0; i < cost_centers.length; i++)
-                center_numbers.push(cost_centers[i].slice(1, 2) + "_TTM");
+            for (let i = 0; i < filters.cost_center.length; i++)
+                center_numbers.push(filters.cost_center[i].slice(1, 2) + "_TTM");
         }
     }
 
@@ -279,19 +243,47 @@ function generate_tabs(cost_centers, consolidated_data) {
     return center_numbers;
 }
 
+// generate a table for the cost center passed in arg
+function generate_per_cost_center(dataset, cost_center_name, mode) {
+    $table_id = "table_" + id;
+    tables_array.push("#" + $table_id);
+    id++;
+
+    return generate_single_table(dataset, $table_id, "Consolidated Income Statement", mode, cost_center_name);
+}
+
 // shortcut that generates the consolidated table without extra adjustments 
-function generate_single_table(company, month, year, dataset, curr_month_year, prev_month_year, $table_id, title, mode) {
-    // css for the table 
-    var html = generate_table_css();
+function generate_single_table(dataset, $table_id, title, mode, cost_center_name = "") {
+    let html = ""
     
-    // the table containing all the data in html format
-    html += '<div id="data">';
-    html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-    html += generate_table_caption(company, month, year, title);
-    html += generate_table_head(month, year, mode);
-    html += generate_table_body(dataset, curr_month_year, prev_month_year, mode);
-    html += '</table>';
-    html += '</div>';
+    if (cost_center_name == "") {
+        // css for the table 
+        html = generate_table_css();
+
+        // the table containing all the data in html format
+        html += '<div id="data">';
+        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
+        html += generate_table_caption(title);
+        html += generate_table_head(mode);
+        html += generate_table_body(dataset, mode);
+        html += '</table>';
+        html += '</div>';
+
+    } else {
+        html += '<div id="data">';
+        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
+        html += generate_table_caption((cost_center_name.slice(5, -5) + " Income Statement"));
+        html += generate_table_head(mode);
+
+        mode == "year_to_date" ? start_index = 0 : start_index = 1;
+
+        for (let j = start_index; j < dataset[0].length; j++) 
+            if (dataset[0][j][0]["dataset_for"] === cost_center_name) 
+                html += generate_table_body(dataset[0][j+1], mode);
+
+        html += '</table>';
+        html += '</div>';
+    }
 
     return html;
 }
@@ -301,103 +293,88 @@ function generate_table_css() {
     var table_css = "";
 
     table_css += '<style>';
-    table_css += '    .table-data-right { font-family: Calibri; font-weight: normal; text-align: right; }';
-    table_css += '    .table-data-left  { font-family: Calibri; font-weight: normal; text-align: left;  }';
+    table_css += '.table-data-right { font-family: Calibri; font-weight: normal; text-align: right; }';
     table_css += '</style>';
 
     return table_css;
 }
 
 // generates the table's caption on top
-function generate_table_caption(company, month, year, title) {
+function generate_table_caption(title) {
     var table_caption = "";
-    var date = get_last_date(month, year);
+    var date = get_last_date(filters.period_end_month, filters.to_fiscal_year);
+    var span = (contents = "") => { return '<span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + contents + '</span>'; }
 
     table_caption += '<caption style="text-align: left;">';
-    table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + company + '</br></span>';
-    table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + title + '</br></span>';
-    if (!(report_type == "Skinny" && mode == "balance_sheet"))
-        table_caption += '    <span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + month + '&nbsp;' + date + '&nbsp;' + year + '</span>';
+    table_caption += span(filters.company + '</br>');
+    table_caption += span(title + '</br>');
+    if (!(filters.report_type == "Skinny" && mode == "balance_sheet"))
+        table_caption += span(filters.period_end_month + '&nbsp;' + date + '&nbsp;' + filters.to_fiscal_year);
     table_caption += '</caption>';
 
     return table_caption;
 }
 
 // generates the table's column names
-function generate_table_head(month, year, mode) {
+function generate_table_head(mode) {
     var html = "";
-    var blank_column = indent + indent + "&nbsp;&nbsp;&nbsp;";
-    var date = get_last_date(month, year);
+    var blank_column = indent + indent + indent + indent + indent;
+    var date = get_last_date(filters.period_end_month, filters.to_fiscal_year);
+    var th = (contents = "") => { return '<th style="text-align: right; font-size: 10pt" colspan=1>' + contents + '</th>'; }
 
-    if (report_type == "Skinny") {
-        html += '<thead>';
-        if (mode == "income_statement") {
-            html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + get_formatted_date(month, year, 0) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + 'YTD ' + year.toString().slice(-2) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '</tr>';
+    html += '<thead>';
+    html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
+    if (filters.report_type == "Skinny") {
+        if (mode == "year_to_date") {
+            html += th();
+            html += th(indent + get_formatted_date(filters.period_end_month, filters.to_fiscal_year, 0));
+            html += th(blank_column);
+            html += th(indent + 'YTD ' + filters.to_fiscal_year.toString().slice(-2));
+            html += th(blank_column);
         } else if (mode == "balance_sheet") {
             html += '<tr></tr>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + month + '&nbsp;' + date + ',&nbsp;' + year + '</th>';
+            html += th();
+            html += th();
+            html += th(indent + filters.period_end_month + '&nbsp;' + date + ',&nbsp;' + filters.to_fiscal_year);
         }
-        html += '</thead>';
-    } else if (report_type == "Regular" || report_type == "Detailed")  {
+    } else if (filters.report_type == "Regular" || filters.report_type == "Detailed")  {
         if (mode == "year_to_date") {
-            html += '<thead>';
-            html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + get_formatted_date(month, year, 0) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + get_formatted_date(month, year, 1) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + 'YTD ' + year.toString().slice(-2) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + 'YTD ' + (parseInt(year) - 1).toString().slice(-2) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + blank_column + '</th>';
-            html += '</tr>';
-            html += '</thead>';
+            html += th();
+            html += th(indent + get_formatted_date(filters.period_end_month, filters.to_fiscal_year, 0));
+            html += th(blank_column);
+            html += th(indent + get_formatted_date(filters.period_end_month, filters.to_fiscal_year, 1));
+            html += th(blank_column);
+            html += th(indent + 'YTD ' + filters.to_fiscal_year.toString().slice(-2));
+            html += th(blank_column);
+            html += th(indent + 'YTD ' + (parseInt(filters.to_fiscal_year) - 1).toString().slice(-2));
+            html += th(blank_column);
         } else if (mode == "trailing_12_months") {
-            var ttm_period = get_ttm_period(month.slice(0, 3).toLowerCase() + "_" + year);
-    
-            html += '<thead>';
-            html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-    
+            html += th();
             for(let i = 0; i < ttm_period.length; i++)
-                html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + get_formatted_date(ttm_period[i], ttm_period[i], 0) + '</th>';
-    
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + indent + 'Total</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + indent + '%</th>';
-            html += '</tr>';
-            html += '</thead>';		
+                html += th(indent + get_formatted_date(ttm_period[i], ttm_period[i], 0));
+            html += th(indent + indent + 'Total');
+            html += th(indent + indent + '%');
         } else if (mode == "balance_sheet") {
-            html += '<thead>';
-            html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1></th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + indent + get_formatted_date(month, year, 0) + '</th>';
-            html += '<th style="text-align: right; font-size: 10pt" colspan=1>' + indent + indent + get_formatted_date(month, year, 1) + '</th>';
-            html += '</tr>';
-            html += '</thead>';
+            html += th();
+            html += th(indent + indent + get_formatted_date(filters.period_end_month, filters.to_fiscal_year, 0));
+            html += th(indent + indent + get_formatted_date(filters.period_end_month, filters.to_fiscal_year, 1));
         }
     }
+    html += '</tr>';
+    html += '</thead>';
     
     return html;
 }
 
 // generates the table's rows
-function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
+function generate_table_body(dataset, mode) {
     var html = ""; // holds the html that is returned
 
-    total_income_global = get_total_income(dataset, curr_month_year, prev_month_year, mode);
+    global_total_income = get_total_income(dataset, mode);
 
     html += '<tbody>'; // start html table body
 
-    if (report_type == "Skinny") {
+    if (filters.report_type == "Skinny") {
         if (mode == "year_to_date") {
             var amortization             = [0, 0];
             var interest                 = [0, 0];
@@ -410,14 +387,14 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
             var total_other_income       = [0, 0];
             var total_operating_expenses = [0, 0];
 
-            // total_income_global holds more than 2 values, so we only pick the ones we need
-            total_income = [total_income_global[0], total_income_global[2]];
+            // global_total_income holds more than 2 values, so we only pick the ones we need
+            total_income = [global_total_income[0], global_total_income[2]];
             html += '<tr></tr>';
             html += append_total_row("Income", total_income, mode, true);
 
             // gather print groups for Operating Expenses
             if (get_whether_category_exists(dataset, "Operating Expenses")) {
-                var merged_print_groups = get_merged_print_groups("Operating Expenses", dataset, curr_month_year, prev_month_year, mode);
+                var merged_print_groups = get_merged_print_groups("Operating Expenses", dataset, mode);
 
                 // collect values from the print groups, accumulate into required categories
                 for (let i = 0; i < merged_print_groups.length; i++) { 
@@ -441,14 +418,14 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
 
             // gather CoGS values
             if (get_whether_category_exists(dataset, "Cost of Goods Sold")) {
-                gross_margin_values = get_gross_margin_values(dataset, curr_month_year, prev_month_year);
+                gross_margin_values = get_gross_margin_values(dataset);
                 gross_margin_values = [gross_margin_values[0], gross_margin_values[2]];
-                html += append_cogs_section(dataset, curr_month_year, prev_month_year, mode);
+                html += append_cogs_section(dataset, mode);
             }
 
             // gather Other Income values
             if (get_whether_category_exists(dataset, "Other Income")) {
-                total_other_income = get_category_total("Other Income", dataset, curr_month_year, prev_month_year, mode);
+                total_other_income = get_category_total("Other Income", dataset, mode);
                 total_other_income = [total_other_income[0], total_other_income[2]];
             }
             
@@ -486,20 +463,20 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
 
                 // append Current Assets
                 if (get_whether_category_exists(dataset, "Current Assets"))
-                    html += append_category_rows("Current Assets", dataset, curr_month_year, prev_month_year, mode, -1);
+                    html += append_category_rows("Current Assets", dataset, mode, -1);
                 
                 // append Property Plant & Equipment
-                var property_plant_equipment = [get_particular_print_group("5 - Property Plant & Equipment", dataset, curr_month_year, prev_month_year)[0]];
+                var property_plant_equipment = [get_particular_print_group("5 - Property Plant & Equipment", dataset)[0]];
                 html += append_data_row([], ("Property Plant & Equipment"), property_plant_equipment, mode, "font-weight: bold;", "font-weight: bold;");
 
                 // append Goodwill
                 html += '<tr></tr>';
-                var property_plant_equipment = [get_particular_print_group("6 - Goodwill", dataset, curr_month_year, prev_month_year)[0]];
+                var property_plant_equipment = [get_particular_print_group("6 - Goodwill", dataset)[0]];
                 html += append_data_row([], ("Goodwill"), property_plant_equipment, mode, "font-weight: bold;", "font-weight: bold;");
 
                 // append Total Assets
                 html += '<tr></tr>';
-                var total_asset = [get_particular_print_group("Total Asset", dataset, curr_month_year, prev_month_year)[0]];
+                var total_asset = [get_particular_print_group("Total Asset", dataset)[0]];
                 html += append_data_row([], ("Total Assets"), total_asset, mode, "font-weight: bold; border-bottom: 1px double black; border-top: 1px solid black;", "font-weight: bold;");
                 
                 // ------------------------ ----------- ------------------------
@@ -515,19 +492,19 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                 var temp = [];
 
                 // ------------------------ current liabilities ------------------------
-                temp = get_merged_print_groups("Accounts Payable", dataset, curr_month_year, prev_month_year, mode);
+                temp = get_merged_print_groups("Accounts Payable", dataset, mode);
                 for (let i = 0; i < temp.length; i++) 
                     entries.push(temp[i]);
                 
-                temp = get_merged_print_groups("Current Liabilities", dataset, curr_month_year, prev_month_year, mode);
+                temp = get_merged_print_groups("Current Liabilities", dataset, mode);
                 for (let i = 0; i < temp.length; i++) 
                     entries.push(temp[i]);
 
-                temp = get_merged_print_groups("Duties and Taxes", dataset, curr_month_year, prev_month_year, mode);
+                temp = get_merged_print_groups("Duties and Taxes", dataset, mode);
                 for (let i = 0; i < temp.length; i++) 
                     entries.push(temp[i]);
 
-                entries = get_merged_dataset(entries, curr_month_year, prev_month_year);
+                entries = get_merged_dataset(entries);
                 for (let i = 0; i < entries.length; i++) {
                     let start = (entries[i].account.indexOf("-")) + 2;
                     let title = indent + entries[i].account.slice(start);
@@ -543,7 +520,7 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                 entries = [];
                 entries_total = 0;
 
-                entries = get_merged_print_groups("Long-Term Liabilities", dataset, curr_month_year, prev_month_year, mode);
+                entries = get_merged_print_groups("Long-Term Liabilities", dataset, mode);
                 for (let i = 0; i < entries.length; i++) {
                     let start = (entries[i].account.indexOf("-")) + 2;
                     let title = indent + entries[i].account.slice(start);
@@ -551,40 +528,31 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                     html += append_data_row([], title, [entries[i].curr_data], mode);
                 }
                 html += append_total_row("Long-Term Liabilities", [entries_total], mode);
-
-                html += append_equity_section(dataset, curr_month_year, prev_month_year);
+                html += append_equity_section(dataset);
             } else {
                 let total_assets_object;
                 let total_liabilities_object;
-                let current_indent = 0;
 
                 for (let i = 0; i < dataset.length; i++) {
-                    // if (dataset[i].indent < current_indent)
-                    //     html += '<tr></tr>';
-                    // current_indent = dataset[i].indent;
-
                     if (dataset[i].is_group) {
-
                         if (dataset[i].account == "Assets") {
                             total_assets_object = dataset[i];
                             html += append_group_row("Assets", true);
-
                         } else if (dataset[i].account == "Liabilities") {
                             total_liabilities_object = dataset[i]; 
                             html += append_total_row("Total Assets", [total_assets_object[curr_month_year]], mode);
                             html += '<tr></tr>';
                             html += append_group_row("Liabilities", true);
-
                         } else {
                             html += append_data_row([], get_formatted_name(dataset[i]), [dataset[i][curr_month_year]], mode);
                         }
                     }
                 }
                 html += append_total_row("Total Liabilities", [total_liabilities_object[curr_month_year]], mode);
-                html += append_equity_section(dataset, curr_month_year, prev_month_year);
+                html += append_equity_section(dataset);
             }
         }
-    } else if (report_type == "Regular" || report_type == "Detailed") {
+    } else if (filters.report_type == "Regular" || filters.report_type == "Detailed") {
         if (mode == "year_to_date" || mode == "trailing_12_months") {
             var total_expenses = [];
 
@@ -599,53 +567,52 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                 // for each category, append the rows under it and also append the total row
                 if (get_whether_category_exists(dataset, income_statement_categories[i])) {
                     if (income_statement_categories[i] == "Other Expenses") {
-                        html += append_category_rows(income_statement_categories[i], dataset, curr_month_year, prev_month_year, mode, /*indent offset*/ 0, /*exclude_income_taxes*/ true);
+                        html += append_category_rows(income_statement_categories[i], dataset, mode, /*indent offset*/ 0, /*exclude_income_taxes*/ true);
                         html += "<tr></tr>";
                     } else {
-                        html += append_category_rows(income_statement_categories[i], dataset, curr_month_year, prev_month_year, mode);
+                        html += append_category_rows(income_statement_categories[i], dataset, mode);
                         html += "<tr></tr>";
                     }
                 }
 
                 // cost of goods sold gets appended right after Other Income
                 if (income_statement_categories[i] == "Other Income") {
-                    html += append_total_row("Income", total_income_global, mode, true);
+                    html += append_total_row("Income", global_total_income, mode, true);
                     html += "<tr></tr>";
                     if (get_whether_category_exists(dataset, "Cost of Goods Sold"))
-                        html += append_cogs_section(dataset, curr_month_year, prev_month_year, mode);
+                        html += append_cogs_section(dataset, mode);
 
                 // Other Expenses is the final category, so Total Expenses needs to be appended underneath it
                 } else if (income_statement_categories[i] == "Other Expenses") {
-                    total_expenses = get_total_expenses(dataset, curr_month_year, prev_month_year, mode);
+                    total_expenses = get_total_expenses(dataset, mode);
                     html += append_total_row("Expenses", total_expenses, mode, true);
                     html += "<tr></tr>";
                     html += "<tr></tr>";
                 }
             }
 
-
             // subtract expenses from income and append Net Income Before Taxes
             let net_income_before_taxes = [];
             for (let i = 0; i < total_expenses.length; i++) 
-                net_income_before_taxes.push(gross_profit_global[i] - total_expenses[i]);
+                net_income_before_taxes.push(global_gross_profit[i] - total_expenses[i]);
 
             html += append_total_row("Net Income Before Taxes", net_income_before_taxes, mode, true, true);
 
             // append Income Taxes
-            html += append_data_row([], (indent + "Income Taxes"), income_taxes_global, mode);
+            html += append_data_row([], (indent + "Income Taxes"), global_income_taxes, mode);
             html += "<tr></tr>";
             
             // subtract taxes from net income and append the Net Income
             let net_income = [];
             for (let i = 0; i < net_income_before_taxes.length; i++) 
-                net_income.push(net_income_before_taxes[i] - income_taxes_global[i]);
+                net_income.push(net_income_before_taxes[i] - global_income_taxes[i]);
             html += append_total_row("Net Income", net_income, mode, true, true);
 
         } else if (mode == "balance_sheet") {
             html += append_group_row("Assets", true);
             for (let i = 0; i < balance_sheet_categories.length; i++) {
                 if (get_whether_category_exists(dataset, balance_sheet_categories[i]))
-                    html += append_category_rows(balance_sheet_categories[i], dataset, curr_month_year, prev_month_year, mode);
+                    html += append_category_rows(balance_sheet_categories[i], dataset, mode);
                 else
                     if (debug_output) 
                         console.log("[!] " + balance_sheet_categories[i] + " does not exists");
@@ -654,8 +621,8 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                     for (let i = 0; i < dataset.length; i++) {
                         if (dataset[i]["account"] == "Assets") {
                             var total_assets = [
-                                Math.floor(dataset[i][curr_month_year]),
-                                Math.floor(dataset[i][prev_month_year])
+                                Math.round(dataset[i][curr_month_year]),
+                                Math.round(dataset[i][prev_month_year])
                             ];
 
                             html += append_total_row("Assets", total_assets, mode, true);
@@ -670,8 +637,8 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                     for (let i = 0; i < dataset.length; i++) {
                         if (dataset[i]["account"] == "Liabilities") {
                             var total_liabilities = [
-                                Math.floor(dataset[i][curr_month_year]),
-                                Math.floor(dataset[i][prev_month_year])
+                                Math.round(dataset[i][curr_month_year]),
+                                Math.round(dataset[i][prev_month_year])
                             ];
 
                             html += append_total_row("Liabilities", total_liabilities, mode, true);
@@ -680,10 +647,9 @@ function generate_table_body(dataset, curr_month_year, prev_month_year, mode) {
                     }
                 }
             }
-            html += append_equity_section(dataset, curr_month_year, prev_month_year);
+            html += append_equity_section(dataset);
         }
     }
-
 
     html += '</tbody>'; // end html table body
 
@@ -726,7 +692,7 @@ function get_formatted_name(account_object, indent_offset = 0) {
     for (let i = 0; i < account_object["indent"] && i < 2 + indent_offset; i++)
         indent_string += indent;
 
-    if (report_type != "Detailed") {
+    if (filters.report_type != "Detailed") {
         // check if the account field has the print group name, otherwise we print the account name
         // the split removes the number in front of the strings like "30 - Trade Sales" to "Trade Sales"
         if (account_object["account"] != "") {
@@ -747,8 +713,6 @@ function get_formatted_name(account_object, indent_offset = 0) {
         }
 
     } else {
-
-
         account = capitialize_each_word(account_object["account"]);
     }
     
@@ -806,7 +770,7 @@ function get_ttm_period(curr_month_year) {
 }
 
 // calculates and returns an array of the total income broken into months
-function get_total_income(dataset, curr_month_year, prev_month_year, mode) {
+function get_total_income(dataset, mode) {
     if (debug_output) 
         console.log("--> entering get_total_income()");
 
@@ -816,10 +780,10 @@ function get_total_income(dataset, curr_month_year, prev_month_year, mode) {
     var total_other   = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
     if (get_whether_category_exists(dataset, "Product Sales"))
-        var total_product = get_category_total("Product Sales", dataset, curr_month_year, prev_month_year, mode);
+        var total_product = get_category_total("Product Sales", dataset, mode);
 
     if (get_whether_category_exists(dataset, "Other Income"))
-        var total_other = get_category_total("Other Income", dataset, curr_month_year, prev_month_year, mode);
+        var total_other = get_category_total("Other Income", dataset, mode);
 
     if (mode == "year_to_date") {
         for (let i = 0; i < 4; i++)
@@ -835,17 +799,17 @@ function get_total_income(dataset, curr_month_year, prev_month_year, mode) {
 }
 
 // calculates and returns an array of the total expenses broken into months
-function get_total_expenses(dataset, curr_month_year, prev_month_year, mode) {
+function get_total_expenses(dataset, mode) {
     // values for:     [jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec, tot]
     var total_values    = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // array of totals
     var total_operating = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     var total_other     = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
     if (get_whether_category_exists(dataset, "Operating Expenses"))
-        var total_operating = get_category_total("Operating Expenses", dataset, curr_month_year, prev_month_year, mode);
+        var total_operating = get_category_total("Operating Expenses", dataset, mode);
 
     if (get_whether_category_exists(dataset, "Other Expenses"))
-        var total_other = get_category_total("Other Expenses", dataset, curr_month_year, prev_month_year, mode, /*exclude_income_taxes*/ true);
+        var total_other = get_category_total("Other Expenses", dataset, mode, /*exclude_income_taxes*/ true);
 
     if (mode == "year_to_date") {
         for (let i = 0; i < 4; i++)
@@ -859,7 +823,7 @@ function get_total_expenses(dataset, curr_month_year, prev_month_year, mode) {
 }
 
 // returns a particular print group from the dataset
-function get_particular_print_group(print_group_name, dataset, curr_month_year, prev_month_year) {
+function get_particular_print_group(print_group_name, dataset) {
     var particular_print_group = [0.0, 0.0];
 
     for (let i = 0; i < dataset.length; i++) {
@@ -875,13 +839,12 @@ function get_particular_print_group(print_group_name, dataset, curr_month_year, 
 }
 
 // combines duplicate print groups in the given category and accumulates their values
-function get_merged_print_groups(category_name, dataset, curr_month_year, prev_month_year, mode) {
+function get_merged_print_groups(category_name, dataset, mode) {
     let index = 0;
     let account = "";
     let print_groups = [];
-    let ttm_period = get_ttm_period(curr_month_year);
 
-    if (report_type == "Detailed") {
+    if (filters.report_type == "Detailed") {
         if (mode == "year_to_date") {
             // find the beginning of this category and keep the index
             while (dataset[index]["account"] != category_name && index < dataset.length) 
@@ -897,7 +860,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
             while (dataset[index]["parent_account"] == category_name) {
                 // create an object containing the info and push() to print_groups[]
                 if (category_name == "Other Expenses" && dataset[index]["account"].includes("Income Tax")) {
-                    income_taxes_global = [
+                    global_income_taxes = [
                         dataset[index][curr_month_year],
                         dataset[index][prev_month_year],
                         dataset[index]["total"],
@@ -938,7 +901,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
 
             while (dataset[index]["parent_account"] == category_name) {
                 if (category_name == "Other Expenses" && dataset[index]["account"].includes("Income Tax")) {
-                    income_taxes_global = [
+                    global_income_taxes = [
                         dataset[index][ttm_period[0]],
                         dataset[index][ttm_period[1]],
                         dataset[index][ttm_period[2]],
@@ -1013,7 +976,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
                     break;
             }
         }
-    } else if (report_type == "Regular" || report_type == "Skinny") {
+    } else if (filters.report_type == "Regular" || filters.report_type == "Skinny") {
         if (mode == "year_to_date") {
             // find the beginning of this category and keep the index
             while (dataset[index]["account"] != category_name && index < dataset.length) 
@@ -1024,7 +987,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
                 account = dataset[index]["account"];
 
                 if (category_name == "Other Expenses" && account.includes("Income Tax")) {
-                    income_taxes_global = [
+                    global_income_taxes = [
                         dataset[index][curr_month_year],
                         dataset[index][prev_month_year],
                         dataset[index]["total"],
@@ -1087,7 +1050,7 @@ function get_merged_print_groups(category_name, dataset, curr_month_year, prev_m
                 account = dataset[index]["account"];
 
                 if (category_name == "Other Expenses" && account.includes("Income Tax")) {
-                    income_taxes_global = [
+                    global_income_taxes = [
                         dataset[index][ttm_period[0]],
                         dataset[index][ttm_period[1]],
                         dataset[index][ttm_period[2]],
@@ -1249,11 +1212,9 @@ function get_merged_dataset(dataset) {
 }
 
 // finds the total amount per year based on the category name passed // switch between modes using the "trailing_12_months" boolean
-function get_category_total(category_name, dataset, curr_month_year, prev_month_year, mode, exclude_income_taxes = false) {
+function get_category_total(category_name, dataset, mode, exclude_income_taxes = false) {
     if (debug_output) 
         console.log("\t[" + category_name + "] calculating total");
-
-    var ttm_period = get_ttm_period(curr_month_year);
 
     // values for:     [curr, prev, curr_ytd, prev_ytd] <- ytd
     // values for:     [jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec, tot] <- ttm
@@ -1314,7 +1275,7 @@ function get_category_total(category_name, dataset, curr_month_year, prev_month_
     
     // round down all the values before returning the array
     for (let j = 0; j < total_values.length; j++)
-        nf.format(Math.floor(total_values[j]));
+        nf.format(Math.round(total_values[j]));
     
     if (debug_output) 
         console.log("\t[" + category_name + "] total calculated (" + mode + ")");
@@ -1346,8 +1307,8 @@ function get_whether_category_exists(dataset, category_name) {
 }
 
 //
-function get_gross_margin_values(dataset, curr_month_year, prev_month_year) {
-    var total_income = total_income_global;
+function get_gross_margin_values(dataset) {
+    var total_income = global_total_income;
     var total_cogs = [];
     var gross_margins = [];
 
@@ -1376,33 +1337,33 @@ function get_gross_margin_values(dataset, curr_month_year, prev_month_year) {
 
 
 // compresses and returns the rows as print_groups[] that fall under the "catergory_name" arg // switch between modes using the mode param
-function append_category_rows(category_name, dataset, curr_month_year, prev_month_year, mode, indent_offset = 0, exclude_income_taxes = false) {
+function append_category_rows(category_name, dataset, mode, indent_offset = 0, exclude_income_taxes = false) {
     if (debug_output) 
         console.log("\t[" + category_name + "] getting rows");
 
     let index = 0;
     let html = "";
     let account = "";
-    let merged_print_groups = get_merged_print_groups(category_name, dataset, curr_month_year, prev_month_year, mode);
+    let merged_print_groups = get_merged_print_groups(category_name, dataset, mode);
     let category_total = [];
 
-    if (exclude_income_taxes)
-        category_total = get_category_total(category_name, dataset, curr_month_year, prev_month_year, mode, /* exclude_income_taxes = */ true);
+    if (exclude_income_taxes) 
+        category_total = get_category_total(category_name, dataset, mode, /* exclude_income_taxes = */ true);
     else
-        category_total = get_category_total(category_name, dataset, curr_month_year, prev_month_year, mode);
+        category_total = get_category_total(category_name, dataset, mode);
 
     // find the beginning of this category and keep the index
     while (dataset[index]["account"] != category_name && index < dataset.length) 
         index++;
 
     // append the group header before the rest of the rows
-    if (!(report_type == "Skinny" && mode == "balance_sheet"))
+    if (!(filters.report_type == "Skinny" && mode == "balance_sheet"))
         html += append_group_row(get_formatted_name(dataset[index], indent_offset));
 
     // we need to move to the next index because the current index is the header itself
     index++;
 
-    if (report_type == "Regular" || report_type == "Detailed")  {
+    if (filters.report_type == "Regular" || filters.report_type == "Detailed")  {
         if (mode == "year_to_date") {
             var data = [];
             // adds each row's gathered data to the html
@@ -1430,18 +1391,8 @@ function append_category_rows(category_name, dataset, curr_month_year, prev_mont
                 account = get_formatted_name(merged_print_groups[i], indent_offset);
     
                 data = [];
-                data.push(merged_print_groups[i]["ttm_00"]);
-                data.push(merged_print_groups[i]["ttm_01"]);
-                data.push(merged_print_groups[i]["ttm_02"]);
-                data.push(merged_print_groups[i]["ttm_03"]);
-                data.push(merged_print_groups[i]["ttm_04"]);
-                data.push(merged_print_groups[i]["ttm_05"]);
-                data.push(merged_print_groups[i]["ttm_06"]);
-                data.push(merged_print_groups[i]["ttm_07"]);
-                data.push(merged_print_groups[i]["ttm_08"]);
-                data.push(merged_print_groups[i]["ttm_09"]);
-                data.push(merged_print_groups[i]["ttm_10"]);
-                data.push(merged_print_groups[i]["ttm_11"]);
+                for (let k = 0; k < 12; k++) 
+                    data.push(merged_print_groups[i]["ttm_" + (k).toString().padStart(2,0)]); // ttm_00, ... , ttm_11 
                 data.push(merged_print_groups[i]["total"]);
     
                 // if (!(account.includes("Income Tax")))
@@ -1457,8 +1408,8 @@ function append_category_rows(category_name, dataset, curr_month_year, prev_mont
                 account = get_formatted_name(merged_print_groups[i], indent_offset);
     
                 data = [
-                    Math.floor(merged_print_groups[i].curr_data),
-                    Math.floor(merged_print_groups[i].prev_data),
+                    Math.round(merged_print_groups[i].curr_data),
+                    Math.round(merged_print_groups[i].prev_data),
                 ];
     
                 html += append_data_row(category_total, account, data, mode);
@@ -1467,7 +1418,7 @@ function append_category_rows(category_name, dataset, curr_month_year, prev_mont
             // appends a row containing the total values for the current category
             html += append_total_row(category_name, category_total, mode) + "<tr></tr>";
         }
-    } else if (report_type == "Skinny") {
+    } else if (filters.report_type == "Skinny") {
         if (mode == "balance_sheet") {
             var data = [];
             // adds each row's gathered data to the html
@@ -1494,9 +1445,9 @@ function append_group_row(account, is_root = false, inline_css = "") {
 
     html += '<tr>';
     if (is_root)
-        html += '<td class="table-data-right" style="font-weight: bold; font-size: 10pt; ' + inline_css + '" colspan=1>' + account.toUpperCase() + '</td>';
+        html += '<td style="font-weight: bold; font-size: 10pt; ' + inline_css + '" colspan=1>' + account.toUpperCase() + '</td>';
     else
-        html += '<td class="table-data-right" style="font-size: 10pt; ' + inline_css + '" colspan=1>' + account + '</td>';
+        html += '<td style="font-size: 10pt; ' + inline_css + '" colspan=1>' + account + '</td>';
     html += '</tr>';
 
     return html
@@ -1510,65 +1461,46 @@ function append_data_row(total_array, account, data, mode, inline_css_data = "",
 
     html += '<tr>';
  
-    if (report_type == "Skinny") {
-        html += '<td class="table-data-right" style="font-size: 10pt; ' + inline_css_account + '" colspan=1>' + account + '</td>';
+    if (filters.report_type == "Skinny") {
+        html += '<td style="font-size: 10pt; ' + inline_css_account + '" colspan=1>' + account + '</td>';
 
         if (mode == "balance_sheet") 
             html += '<td colspan=1></td>';
 
         for (let i = 0; i < data.length; i++) {
-            html += '<td class="table-data-right" style="font-size: 10pt; ' + inline_css_data + '" colspan=1>' + (nf.format(Math.floor(data[i]))) + '</td>';
+            html += '<td style="font-size: 10pt; ' + inline_css_data + '" colspan=1>' + (nf.format(Math.round(data[i]))) + '</td>';
             html += "<td></td>";
         }
-    } else if (report_type == "Regular" || report_type == "Detailed") {
+    } else if (filters.report_type == "Regular" || filters.report_type == "Detailed") {
         if (mode == "year_to_date") {
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + account + '</td>';
             for (let i = 0; i < data.length; i++) {
-                // round down and format the number to 2 decimal places
-                values.push((nf.format(Math.floor(data[i]))));
-                // get_formatted_number() replaces minus symbols with brackets when it the global flag is true
-                if (Math.floor(data[i]) == 0) 
-                    percentages.push("0%")
-                else
-                    percentages.push(get_formatted_number(((data[i] * 100) / total_income_global[i]).toFixed(2)) + "%");
+                values.push((nf.format(Math.round(data[i]))));
+                Math.round(data[i]) == 0 ? percentages.push("0%") : percentages.push(get_formatted_number(((data[i] * 100) / global_total_income[i]).toFixed(2)) + "%");
             }
 
+            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + '</td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
-
-                if (percentages[i].includes("NaN") || percentages[i].includes("100.00") || percentages[i].includes("Infinity")) {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>100%</td>';
-                } else if (percentages[i].toString().slice(0, -1) == "0.00") {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>0%</td>';
-                } else {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + percentages[i] + '</td>';
-                }
+                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
             }
         } else if (mode == "trailing_12_months") {
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + account + '</td>';
             for (let i = 0; i < data.length; i++)			
-                values.push((nf.format(Math.floor(data[i])))); // round down and format the number to 2 decimal places
+                values.push((nf.format(Math.round(data[i])))); // round down and format the number to 2 decimal places
 
             // get_formatted_number() replaces minus symbols with brackets when it the global flag is true
-            let percentage = (get_formatted_number(((data[data.length - 1] * 100) / total_income_global[total_array.length - 1]).toFixed(2)) + "%");
+            let percentage = (get_formatted_number(((data[data.length - 1] * 100) / global_total_income[total_array.length - 1]).toFixed(2)) + "%");
 
+            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + indent + indent + indent + indent + '</td>';
             for (let i = 0; i < data.length; i++)
-                html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+            html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentage) + '</td>';
 
-            if (percentage.toString().slice(0, -1) == "NaN" || percentage.toString().slice(0, -1) == "100.00") {
-                html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>100%</td>';
-            } else if (percentage.toString().slice(0, -1) == "0.00") {
-                html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>0%</td>';
-            } else {
-                html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + percentage + '</td>';
-            }
         } else if (mode == "balance_sheet") {
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + account + indent + indent + indent + indent + '</td>';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + (nf.format(Math.floor(data[0]))) + '</td>';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + (nf.format(Math.floor(data[1]))) + '</td>';
+            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>' + (nf.format(Math.round(data[0]))) + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>' + (nf.format(Math.round(data[1]))) + '</td>';
         }
     }
-
     html += '</tr>';
         
     return html;
@@ -1584,67 +1516,47 @@ function append_total_row(category_name, category_total, mode, is_root = false, 
     var percentages = [];
 
     for(let i = 0; i < category_total.length; i++) {
-        values.push(nf.format(Math.floor(category_total[i])));
-
-        if (Math.floor(category_total[i]) == 0) 
-            percentages.push("0%")
-        else 
-            percentages.push(get_formatted_number(((category_total[i] * 100) / total_income_global[i]).toFixed(2)) + "%");
+        values.push(nf.format(Math.round(category_total[i])));
+        Math.round(category_total[i]) == 0 ? percentages.push("0%") : percentages.push(get_formatted_number(((category_total[i] * 100) / global_total_income[i]).toFixed(2)) + "%");
     }
 
-    if (report_type == "Skinny") {
-
-        html += '<tr>';
-
+    html += '<tr>';
+    if (filters.report_type == "Skinny") {
         if (mode == "year_to_date") {
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + category_name + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>' + category_name + '</td>';
 
             for (let i = 0; i < values.length; i++) {
-                html += '<td class="table-data-right" style="font-size: 10pt;" colspan=1>' + values[i] + '</td>';
+                html += '<td style="font-size: 10pt;" colspan=1>' + values[i] + '</td>';
                 html += "<td></td>";
             }
         } else if (mode == "balance_sheet") {
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + category_name + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>' + category_name + '</td>';
             html += '<td colspan=1></td>';
-            html += '<td class="table-data-right" style="font-size: 10pt; border-top: 1px solid" colspan=1>' + values[0] + '</td>';
+            html += '<td style="font-size: 10pt; border-top: 1px solid" colspan=1>' + values[0] + '</td>';
             html += "<td></td>";
         }
 
     } else {
         if (is_root) {
             html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-            if (is_custom)
-                html += '<td class="table-data-right" style="font-weight: bold; font-size: 10pt" colspan=1>' + category_name.toUpperCase() + '</td>';
-            else
-                html += '<td class="table-data-right" style="font-weight: bold; font-size: 10pt" colspan=1>' + 'TOTAL ' + category_name.toUpperCase() + '</td>';
+            html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + (is_custom ? (category_name.toUpperCase()) : ('TOTAL ' + category_name.toUpperCase())) + '</td>';
         } else {
             html += '<tr style="border-top: 1px solid black">';
-            if (is_custom)
-                html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + indent + category_name + '</td>';
-            else
-                html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + indent + 'Total ' + category_name + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>' + (is_custom ? (indent + category_name) : (indent + 'Total ' + category_name)) + '</td>';
         }
 
         if (mode == "year_to_date") {
             for (let i = 0; i < 4; i++) {
-                html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
-
-                if (percentages[i].includes("NaN") || percentages[i].includes("100.00") || percentages[i].includes("fin")) {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>100%</td>';
-                } else if (percentages[i].toString().slice(0, -1) == "0.00") {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>0%</### td>';
-                } else {
-                    html += '<td class="table-data-right" style="text-align: right; font-size: 10pt" colspan=1>' + percentages[i] + '</td>';
-                }
+                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
             }
         } else if (mode == "trailing_12_months") {
             for (let i = 0; i < category_total.length; i++)
-                html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
-
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>100%</td>';
+                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+            html += '<td style="font-size: 10pt" colspan=1>100%</td>';
         } else if (mode == "balance_sheet") {
             for (let i = 0; i < 2; i++)
-                html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
         }
     }
     html += '</tr>';
@@ -1656,7 +1568,7 @@ function append_total_row(category_name, category_total, mode, is_root = false, 
 }
 
 // appends the Equity section at the bottom of the Balance Sheet
-function append_equity_section(dataset, curr_month_year, prev_month_year) {
+function append_equity_section(dataset) {
     let html = "";
     let provisional = "Provisional Profit / Loss (Credit)";
     let equity = "Total (Credit)";
@@ -1664,38 +1576,38 @@ function append_equity_section(dataset, curr_month_year, prev_month_year) {
     html += "<tr></tr>";
     html += append_group_row("Equity", true)
 
-    if (report_type == "Regular" || report_type == "Detailed") {
+    if (filters.report_type == "Regular" || filters.report_type == "Detailed") {
         for (let i = 0; i < dataset.length; i++) {
             if (dataset[i]["account"]) {
                 if (dataset[i]["account"].includes(provisional)) {
                     html += '<tr>';
-                    html += '<td class="table-data-right" style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][curr_month_year])) + '</td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][prev_month_year])) + '</td>';
+                    html += '<td style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
                     html += '</tr>';
                 } else if (dataset[i]["account"].includes(equity)) {
                     html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-                    html += '<td class="table-data-right" style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][curr_month_year])) + '</td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][prev_month_year])) + '</td>';
+                    html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
                     html += '</tr>';
                 }  
             }
         }
-    } else if (report_type == "Skinny") {
+    } else if (filters.report_type == "Skinny") {
         for (let i = 0; i < dataset.length; i++) {
             if (dataset[i]["account"]) {
                 if (dataset[i]["account"].includes(provisional)) {
                     html += '<tr>';
-                    html += '<td class="table-data-right" style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
+                    html += '<td style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
                     html += '<td colspan=1></td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
                     html += '</tr>';
                 } else if (dataset[i]["account"].includes(equity)) {
                     html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-                    html += '<td class="table-data-right" style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
+                    html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
                     html += '<td colspan=1></td>';
-                    html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>' + nf.format(Math.floor(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
                     html += '</tr>';
                 }  
             }
@@ -1706,9 +1618,9 @@ function append_equity_section(dataset, curr_month_year, prev_month_year) {
 }
 
 // appends the CoGS and the Gross Margin rows
-function append_cogs_section(dataset, curr_month_year, prev_month_year, mode) {
+function append_cogs_section(dataset, mode) {
     var html = "";
-    var total_income = total_income_global;
+    var total_income = global_total_income;
     var total_cogs = [];
     var gross_margins = [];
     var percentages = [];
@@ -1726,68 +1638,64 @@ function append_cogs_section(dataset, curr_month_year, prev_month_year, mode) {
             break;
         }
     }
-    
-    console.log('total_income', total_income);
 
     for (let i = 0; i < 4; i++) {
-        gross_profit_global.push(total_income[i] - total_cogs[i]);
+        global_gross_profit.push(total_income[i] - total_cogs[i]);
 
         if (total_income[i] == 0) {
             percentages.push(0);
             cogs_percentages.push(0);
         } else {
-            percentages.push(((gross_profit_global[i]) / total_income[i]) * 100);
+            percentages.push(((global_gross_profit[i]) / total_income[i]) * 100);
             cogs_percentages.push((total_cogs[i] / total_income[i]) * 100);
         }
     }
 
     for (let i = 0; i < 4; i++) {
-        total_cogs[i]       = nf.format(Math.floor(total_cogs[i])).toString();
-        gross_margins[i]    = nf.format(Math.floor(gross_profit_global[i])).toString();
+        total_cogs[i]       = nf.format(Math.round(total_cogs[i])).toString();
+        gross_margins[i]    = nf.format(Math.round(global_gross_profit[i])).toString();
         percentages[i]      = percentages[i].toString() + "%";
         cogs_percentages[i] = cogs_percentages[i].toString() + "%";
     }
 
-    if (report_type == "Skinny") {
+    if (filters.report_type == "Skinny") {
 
         html += '<tr>';
-        html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>Cost of Goods Sold</td>';
-        html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[0] + '</td>';
+        html += '<td style="font-size: 10pt" colspan=1>Cost of Goods Sold</td>';
+        html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[0] + '</td>';
         html += "<td></td>";
-        html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[2] + '</td>';
+        html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[2] + '</td>';
         html += '</tr>';
 
         html += '<tr>';
-        html += '<td class="table-data-right" style="font-size: 10pt" colspan=1>Gross Margin</td>';
-        html += '<td class="table-data-right" style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[0] + '</td>';
+        html += '<td style="font-size: 10pt" colspan=1>Gross Margin</td>';
+        html += '<td style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[0] + '</td>';
         html += "<td></td>";
-        html += '<td class="table-data-right" style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[2] + '</td>';
+        html += '<td style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[2] + '</td>';
         html += '</tr>';
         html += '<tr></tr>';
 
-    } else if (report_type == "Regular" || report_type == "Detailed") {
+    } else if (filters.report_type == "Regular" || filters.report_type == "Detailed") {
         if (mode == "year_to_date") {
     
             html += '<tr>';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
+            html += '<td style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[i] + '</td>';
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[i] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[i] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[i] + '</td>';
             }
             html += '</tr>';
     
             html += '<tr style="border-top: 1px solid black">';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
+            html += '<td style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + gross_margins[i] + '</td>';
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[i] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + gross_margins[i] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[i] + '</td>';
             }
             html += '</tr>';
             html += '<tr></tr>';
 
         } else if (mode == "trailing_12_months") {
-            var ttm_period = get_ttm_period(curr_month_year);
-    
             for (let i = 0; i < dataset.length; i++) {
                 if (dataset[i]["account"] == "Cost of Goods Sold") {
                     total_cogs = [
@@ -1811,23 +1719,23 @@ function append_cogs_section(dataset, curr_month_year, prev_month_year, mode) {
             }
 
             for (let i = 0; i < total_cogs.length; i++)
-                gross_profit_global.push(total_income[i] - total_cogs[i]);
+                global_gross_profit.push(total_income[i] - total_cogs[i]);
 
-            percentages = [((gross_profit_global[12]/total_income[12]) * 100) + "%"];
+            percentages = [((global_gross_profit[12]/total_income[12]) * 100) + "%"];
             cogs_percentages = [((total_cogs[12]/total_income[12]) * 100) + "%"];
 
             html += '<tr>';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
+            html += '<td style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
             for (let i = 0; i < total_cogs.length; i++)
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(total_cogs[i]) + '</td>';
-            html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[0] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(total_cogs[i]) + '</td>';
+            html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[0] + '</td>';
             html += '</tr>';
     
             html += '<tr style="border-top: 1px solid black">';
-            html += '<td class="table-data-right" style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
+            html += '<td style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
             for (let i = 0; i < total_cogs.length; i++)
-                html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(gross_profit_global[i]) + '</td>';
-            html += '<td class="table-data-right" style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[0] + '</td>';
+                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(global_gross_profit[i]) + '</td>';
+            html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[0] + '</td>';
             html += '</tr>';
             html += '<tr></tr>';
         }
@@ -1988,3 +1896,5 @@ Content-Type: text/xml; charset="utf-8"
         download_success = true;
     }
 })();
+
+//

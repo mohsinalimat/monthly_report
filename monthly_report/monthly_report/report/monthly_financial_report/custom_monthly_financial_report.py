@@ -22,28 +22,61 @@ old_method = False
 ## FUNCTION CALLED FROM JAVASCRIPT
 ## ============================================================================================================================================
  
+@frappe.whitelist()
+def run_queries(filters, cost_center_name = ""):
+    filters = frappe._dict(json.loads(filters) or {})
+
+    if (cost_center_name == "Consolidated"):
+        return run_consolidated_query(filters)
+    elif (cost_center_name == "Balance Sheet"):
+        return run_balance_sheet_query(filters)
+    else:
+        return run_cost_center_query(filters, cost_center_name)
+
+
+## 
+def run_balance_sheet_query(filters):
+    dataset = []
+
+    # generate the balance sheet
+    print("Getting data for Balance Sheet")
+    balance_sheet_dataset = (get_balance_sheet(filters))
+    dataset.append(balance_sheet_dataset[0])
+    dataset.append(balance_sheet_dataset[1])
+
+    return dataset
+
+
+## 
+def run_cost_center_query(filters, cost_center_name):
+    dataset = []
+
+    period = get_income_statement_period(
+        to_fiscal_year            = filters.to_fiscal_year,
+        periodicity               = filters.periodicity,
+        period_end_month          = filters.period_end_month,
+        company                   = filters.company,
+        accumulated_values        = False,  # default value
+        reset_period_on_fy_change = True,   # default value
+        ignore_fiscal_year        = False   # default value
+    )
+
+    print("Getting data for " + cost_center_name.split(" ")[0])
+    cost_center_data = get_cost_center_data(filters, period, cost_center_name)
+    dataset.append(cost_center_data[0])
+    dataset.append(cost_center_data[1])
+
+    return dataset
+
 
 ## calls the functions above and generated Income Statement data
-@frappe.whitelist()
-def generate_monthly_report(filters):
-    filters = frappe._dict(json.loads(filters) or {})
-    
+def run_consolidated_query(filters):
     data = []
     dataset = []
 
     # first append the header for Consolidated
     dataset_header = [{"dataset_for": "Consolidated"}]
     dataset.append(dataset_header)
-
-    # validate the selected filters
-    if not filters:
-        return [], [], None, []
-    if not filters.period_end_month:
-        frappe.throw(_("Please select a month."))
-    if not filters.to_fiscal_year:
-        frappe.throw(_("Please select a year."))
-    if not filters.cost_center:
-        frappe.throw(_("Please select at least one cost center."))
 
     print("Getting data for Consolidated")
 
@@ -87,29 +120,28 @@ def generate_monthly_report(filters):
         total                            = True   # default value
     )
 
-    # then append the dataset for Consolidated
+    # append the dataset for Consolidated
     data.extend(income)
     data.extend(expense)
     dataset.append(data)
 
-    # generate the balance sheet
-    print("Getting data for Balance Sheet")
-    balance_sheet_dataset = (get_balance_sheet(filters))
-    dataset.append(balance_sheet_dataset[0])
-    dataset.append(balance_sheet_dataset[1])
-
-    # generate each cost center data
-    for each_center in filters.cost_center:
-        print("Getting data for " + each_center.split(" ")[0])
-        cost_center_data = get_cost_center_data(filters, period, each_center)
-        dataset.append(cost_center_data[0])
-        dataset.append(cost_center_data[1])
-
-    print("Dataset returned")
     return dataset
 
 
+## not used as filters have defaults
+def validate_filters(filters):
+    # validate the selected filters
+    if not filters:
+        return [], [], None, []
+    if not filters.period_end_month:
+        frappe.throw(_("Please select a month."))
+    if not filters.to_fiscal_year:
+        frappe.throw(_("Please select a year."))
+    if not filters.cost_center:
+        frappe.throw(_("Please select at least one cost center."))
 
+
+## 
 def get_year_end_date(to_fiscal_year, period_end_month):
     from_fiscal_year = str(int(to_fiscal_year) - 1)# we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
@@ -149,7 +181,7 @@ def get_year_end_date(to_fiscal_year, period_end_month):
     return getdate(year_end_date)
 
 
-
+## 
 def get_year_start_date(to_fiscal_year, period_end_month):
     from_fiscal_year = str(int(to_fiscal_year))# we want to run this on the same fiscal year, so from_fiscal_year = to_fiscal_year
     fiscal_year = get_fiscal_year_data(from_fiscal_year, to_fiscal_year)
@@ -178,6 +210,7 @@ def get_year_start_date(to_fiscal_year, period_end_month):
 ## ============================================================================================================================================
 
 
+## 
 def get_cost_center_data(filters, period, center_name):
     filters.cost_center = [center_name]
 
@@ -535,6 +568,7 @@ def set_income_statement_entries(company, from_date, to_date, root_lft, root_rgt
 ## ============================================================================================================================================
 
 
+#
 def get_balance_sheet(filters):
     columns = [{"dataset_for": "Balance Sheet"}]
     data = []
