@@ -101,7 +101,7 @@ function gather_data(curr_thing_to_query = 0) {
 
 			callback: function (r) {
 				_dataset.push(r.message[0]);
-				_dataset.push(r.message[1]);
+				_dataset.push(remove_blank_entires(r.message[1]));
 				gather_data(++curr_thing_to_query);
 			}
         })
@@ -122,11 +122,9 @@ function gather_data(curr_thing_to_query = 0) {
 function remove_blank_entires(dirty_dataset) {
     clean_dataset = [];
 
-    for (let i = 0; i < dirty_dataset.length; i++) {
-        if (dirty_dataset[i]['account']) {
+    for (let i = 0; i < dirty_dataset.length; i++) 
+        if (dirty_dataset[i]['account']) 
             clean_dataset.push(dirty_dataset[i]);
-        }
-    }
 
     return clean_dataset;
 }
