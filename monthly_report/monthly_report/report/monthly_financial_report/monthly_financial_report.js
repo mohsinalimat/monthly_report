@@ -6,6 +6,7 @@ var minus_to_brackets = 0; // determines if negative numbers are to be represent
 var download_excel    = 1; // determines if the excel spreadsheet is to be downloaded at the end of processing
 var debug_output      = 0; // determines if console logs should be printed
 var skinny_bs_v1      = 0; // swtiches between the two version of balance sheets
+include_timestamp     = 0;
 
 
 // ============================================================================================================================================
@@ -15,7 +16,7 @@ var skinny_bs_v1      = 0; // swtiches between the two version of balance sheets
 
 var indent = "&nbsp;&nbsp;&nbsp;&nbsp;"; // prints an indent of 4 spaces
 
-var _start_time;
+var start_time;
 var _dataset = [];
 var filters = [];
 var month_name = "";
@@ -35,12 +36,14 @@ var nf = new Intl.NumberFormat('en-US'); // number format definition
 var download_success = false;
 
 const validate_number = (number) => {
-    if (number.includes("NaN") || number.includes("100.00") || number.includes("Infinity"))
-        return "100%";
-    else if (number.toString().slice(0, -1) == "0.00")
-        return "0%";
-    else
-        return number;
+    try {
+        if (number.includes("NaN") || number.includes("100.00") || number.includes("Infinity"))
+            return "100%";
+        else if (number.toString().slice(0, -1) == "0.00")
+            return "0%";
+        else
+            return number;
+    } catch(err) {}
 }
 
 // categories in the income statements
@@ -76,7 +79,7 @@ frappe.query_reports["Monthly Financial Report"] = {
         report.page.add_inner_button(__("Export Report"), function () {
             filters = report.get_values();
 
-            _start_time = new Date();
+            start_time = new Date();
 
             if (!filters.period_end_month)
                 frappe.throw('Please select an ending month');
@@ -113,7 +116,7 @@ function gather_data(curr_thing_to_query = 0) {
         generate_report([_dataset]);
 
         // Total execution time for display
-		var total_time = ((new Date()).getTime() - _start_time.getTime()) / 1000;
+		var total_time = ((new Date()).getTime() - start_time.getTime()) / 1000;
 		var minutes = Math.floor(total_time / 60);
 		var seconds = Math.round(total_time - (minutes * 60));
 		var display_time = (minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} and ` : '') + `${seconds} second${seconds != 1 ? 's' : ''}`;
@@ -145,14 +148,14 @@ function init_globals(dataset) {
     tables_array = [];
     id = 0; 
 
-    console.log("---------- consolidated ----------");
-    get_category_names(dataset[0][1]);
-    console.log("---------- balancesheet ----------");
-    get_category_names(dataset[0][3]);
+    // console.log("---------- consolidated ----------");
+    // get_category_names(dataset[0][1]);
+    // console.log("---------- balancesheet ----------");
+    // get_category_names(dataset[0][3]);
 
 }
 
-//
+// unused ???
 function get_category_names(dataset) {
     for (let i = 0; i < dataset.length; i++)
         if (dataset[i]['indent'] == 1)
@@ -239,7 +242,32 @@ function generate_bal_tables(dataset) {
 
 // generates the filename for the downloaded excel file
 function generate_filename() {
-    return (curr_month_year + "_" + (filters.report_type).toLowerCase() + '.xls');
+    let formatDate = (date) => {
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var ampm = hours >= 12 ? 'PM' : 'AM';
+
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        minutes = minutes < 10 ? '0'+ minutes : minutes;
+        var strTime = hours + '꞉' + minutes + ' ' + ampm;
+        return "(" + date.getFullYear() + "." + (date.getMonth()+1) + "." + date.getDate() + ", " + strTime + ")";
+    }
+
+    let filename_builder = (month_year, type, time = "") => {
+        let text = "";
+        text += (type);
+        text += (" Monthly Report, ");
+        text += (capitialize_each_word(month_year).replace("_", " "));
+        if (time != "") text += (" " + formatDate(time));
+
+        return text + ".xls";
+    }
+    
+
+    if (include_timestamp)
+        return filename_builder(curr_month_year, filters.report_type, start_time);
+    return filename_builder(curr_month_year, filters.report_type);
 }
 
 // creates tabs based on the cost centers selected in the filters
