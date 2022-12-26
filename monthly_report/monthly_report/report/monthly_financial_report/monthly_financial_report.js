@@ -1144,9 +1144,9 @@ function get_merged_print_groups(category_name, dataset, mode) {
             // find the beginning of this category and keep the index
             try {
                 while (dataset[index]["account"] != category_name && index < dataset.length)
-                index++;
+                    index++;
             } catch(err) {
-                console.log(dataset[index]);
+                console.log("Error between " + dataset[index-1] + " and " + dataset[index+1]);
             }
            
             // we need to move to the next index because the current index is the header itself
