@@ -128,6 +128,8 @@ function gather_data(curr_thing_to_query = 0) {
 //
 function remove_blank_entries(dirty_dataset) {
     clean_dataset = [];
+
+    dirty_dataset.push({})
     
     if (dirty_dataset.length == 1) {
         return dirty_dataset
