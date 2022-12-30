@@ -108,7 +108,7 @@ function gather_data(curr_thing_to_query = 0) {
 
 			callback: function (r) {
 				_dataset.push(r.message[0]);
-				_dataset.push(remove_blank_entires(r.message[1]));
+				_dataset.push(remove_blank_entries(r.message[1]));
 				gather_data(++curr_thing_to_query);
 			}
         })
@@ -126,14 +126,18 @@ function gather_data(curr_thing_to_query = 0) {
 }
 
 //
-function remove_blank_entires(dirty_dataset) {
+function remove_blank_entries(dirty_dataset) {
     clean_dataset = [];
+    
+    if (dirty_dataset.length == 1) {
+        return dirty_dataset
+    } else {
+        for (let i = 0; i < dirty_dataset.length; i++) 
+            if (dirty_dataset[i]['account']) 
+                clean_dataset.push(dirty_dataset[i]);
 
-    for (let i = 0; i < dirty_dataset.length; i++) 
-        if (dirty_dataset[i]['account']) 
-            clean_dataset.push(dirty_dataset[i]);
-
-    return clean_dataset;
+        return clean_dataset;
+    }
 }
 
 // initiates global variables
@@ -143,24 +147,19 @@ function init_globals(dataset) {
     curr_month_year = month_name + "_" + filters.to_fiscal_year;
     prev_month_year = month_name + "_" + (parseInt(filters.to_fiscal_year) - 1).toString();
 
+    global_total_income = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    global_income_taxes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    global_gross_profit = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
     ttm_period = get_ttm_period(curr_month_year);
-    tables_array = [];
-    id = 0; 
-
-    // console.log("---------- consolidated ----------");
-    // get_category_names(dataset[0][1]);
-    // console.log("---------- balancesheet ----------");
-    // get_category_names(dataset[0][3]);
-
 }
 
-// unused ???
-function get_category_names(dataset) {
-    for (let i = 0; i < dataset.length; i++)
-        if (dataset[i]['indent'] == 1)
-            console.log(dataset[i]['account']); 
-}
+// // unused ???
+// function get_category_names(dataset) {
+//     for (let i = 0; i < dataset.length; i++)
+//         if (dataset[i]['indent'] == 1)
+//             console.log(dataset[i]['account']); 
+// }
 
 
 // ============================================================================================================================================
@@ -334,9 +333,12 @@ function generate_single_table(dataset, $table_id, title, mode, cost_center_name
 
         mode == "year_to_date" ? start_index = 0 : start_index = 1;
 
-        for (let j = start_index; j < dataset[0].length; j++) 
-            if (dataset[0][j][0]["dataset_for"] === cost_center_name) 
+        for (let j = start_index; j < dataset[0].length; j++) {
+            if (dataset[0][j][0]["dataset_for"] === cost_center_name) {
                 html += generate_table_body(dataset[0][j+1], mode);
+                break;
+            }
+        }
 
         html += '</table>';
         html += '</div>';
