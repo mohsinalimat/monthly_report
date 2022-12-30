@@ -320,7 +320,7 @@ function generate_single_table(dataset, $table_id, title, mode, cost_center_name
 
         // the table containing all the data in html format
         html += '<div id="data">';
-        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
+        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 9pt" id=' + $table_id + '>';
         html += generate_table_caption(title);
         html += generate_table_head(mode);
         html += generate_table_body(dataset, mode);
@@ -329,7 +329,7 @@ function generate_single_table(dataset, $table_id, title, mode, cost_center_name
 
     } else {
         html += '<div id="data">';
-        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
+        html += '<table style="font-weight: normal; font-family: Calibri; font-size: 9pt" id=' + $table_id + '>';
         html += generate_table_caption((cost_center_name.slice(5, -5) + " Income Statement"));
         html += generate_table_head(mode);
 
@@ -364,7 +364,7 @@ function generate_table_css() {
 function generate_table_caption(title) {
     var table_caption = "";
     var date = get_last_date(filters.period_end_month, filters.to_fiscal_year);
-    var span = (contents = "") => { return '<span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + contents + '</span>'; }
+    var span = (contents = "") => { return '<span style="font-family: Calibri; font-size: 9pt; text-align: left;">' + contents + '</span>'; }
 
     table_caption += '<caption style="text-align: left;">';
     table_caption += span(filters.company + '</br>');
@@ -379,9 +379,9 @@ function generate_table_caption(title) {
 // generates the table's column names
 function generate_table_head(mode) {
     var html = "";
-    var blank_column = indent + indent + indent + indent + indent;
+    var blank_column = indent + indent + indent;
     var date = get_last_date(filters.period_end_month, filters.to_fiscal_year);
-    var th = (contents = "") => { return '<th style="text-align: right; font-size: 10pt" colspan=1>' + contents + '</th>'; }
+    var th = (contents = "") => { return '<th style="text-align: right; font-size: 9pt" colspan=1>' + contents + '</th>'; }
 
     html += '<thead>';
     html += '<tr style="border-top: 1px solid black; border-bottom: 1px solid black;">';
@@ -1506,9 +1506,9 @@ function append_group_row(account, is_root = false, inline_css = "") {
 
     html += '<tr>';
     if (is_root)
-        html += '<td style="font-weight: bold; font-size: 10pt; ' + inline_css + '" colspan=1>' + account.toUpperCase() + '</td>';
+        html += '<td style="font-weight: bold; font-size: 9pt; ' + inline_css + '" colspan=1>' + account.toUpperCase() + '</td>';
     else
-        html += '<td style="font-size: 10pt; ' + inline_css + '" colspan=1>' + account + '</td>';
+        html += '<td style="font-size: 9pt; ' + inline_css + '" colspan=1>' + account + '</td>';
     html += '</tr>';
 
     return html
@@ -1523,13 +1523,13 @@ function append_data_row(total_array, account, data, mode, inline_css_data = "",
     html += '<tr>';
  
     if (filters.report_type == "Skinny") {
-        html += '<td style="font-size: 10pt; ' + inline_css_account + '" colspan=1>' + account + '</td>';
+        html += '<td style="font-size: 9pt; ' + inline_css_account + '" colspan=1>' + account + '</td>';
 
         if (mode == "balance_sheet") 
             html += '<td colspan=1></td>';
 
         for (let i = 0; i < data.length; i++) {
-            html += '<td style="font-size: 10pt; ' + inline_css_data + '" colspan=1>' + (nf.format(Math.round(data[i]))) + '</td>';
+            html += '<td style="font-size: 9pt; ' + inline_css_data + '" colspan=1>' + (nf.format(Math.round(data[i]))) + '</td>';
             html += "<td></td>";
         }
     } else if (filters.report_type == "Regular" || filters.report_type == "Detailed") {
@@ -1539,10 +1539,10 @@ function append_data_row(total_array, account, data, mode, inline_css_data = "",
                 Math.round(data[i]) == 0 ? percentages.push("0%") : percentages.push(get_formatted_number(((data[i] * 100) / global_total_income[i]).toFixed(2)) + "%");
             }
 
-            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + '</td>';
+            html += '<td style="font-size: 9pt; white-space: nowrap;" colspan=1>' + account + '</td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
-                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
+                html += '<td style="text-align: right; font-size: 9pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+                html += '<td style="text-align: right; font-size: 9pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
             }
         } else if (mode == "trailing_12_months") {
             for (let i = 0; i < data.length; i++)			
@@ -1551,15 +1551,15 @@ function append_data_row(total_array, account, data, mode, inline_css_data = "",
             // get_formatted_number() replaces minus symbols with brackets when it the global flag is true
             let percentage = (get_formatted_number(((data[data.length - 1] * 100) / global_total_income[total_array.length - 1]).toFixed(2)) + "%");
 
-            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + indent + indent + indent + indent + '</td>';
+            html += '<td style="font-size: 9pt; white-space: nowrap;" colspan=1>' + account + indent + indent + indent + indent + '</td>';
             for (let i = 0; i < data.length; i++)
-                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
-            html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentage) + '</td>';
+                html += '<td style="text-align: right; font-size: 9pt" colspan=1>' + get_formatted_number(values[i]) + '</td>';
+            html += '<td style="text-align: right; font-size: 9pt" colspan=1>' + validate_number(percentage) + '</td>';
 
         } else if (mode == "balance_sheet") {
-            html += '<td style="font-size: 10pt; white-space: nowrap;" colspan=1>' + account + '</td>';
-            html += '<td style="font-size: 10pt" colspan=1>' + (nf.format(Math.round(data[0]))) + '</td>';
-            html += '<td style="font-size: 10pt" colspan=1>' + (nf.format(Math.round(data[1]))) + '</td>';
+            html += '<td style="font-size: 9pt; white-space: nowrap;" colspan=1>' + account + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>' + (nf.format(Math.round(data[0]))) + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>' + (nf.format(Math.round(data[1]))) + '</td>';
         }
     }
     html += '</tr>';
@@ -1584,40 +1584,40 @@ function append_total_row(category_name, category_total, mode, is_root = false, 
     html += '<tr>';
     if (filters.report_type == "Skinny") {
         if (mode == "year_to_date") {
-            html += '<td style="font-size: 10pt" colspan=1>' + category_name + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>' + category_name + '</td>';
 
             for (let i = 0; i < values.length; i++) {
-                html += '<td style="font-size: 10pt;" colspan=1>' + values[i] + '</td>';
+                html += '<td style="font-size: 9pt;" colspan=1>' + values[i] + '</td>';
                 html += "<td></td>";
             }
         } else if (mode == "balance_sheet") {
-            html += '<td style="font-size: 10pt" colspan=1>' + category_name + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>' + category_name + '</td>';
             html += '<td colspan=1></td>';
-            html += '<td style="font-size: 10pt; border-top: 1px solid" colspan=1>' + values[0] + '</td>';
+            html += '<td style="font-size: 9pt; border-top: 1px solid" colspan=1>' + values[0] + '</td>';
             html += "<td></td>";
         }
 
     } else {
         if (is_root) {
             html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-            html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + (is_custom ? (category_name.toUpperCase()) : ('TOTAL ' + category_name.toUpperCase())) + '</td>';
+            html += '<td style="font-weight: bold; font-size: 9pt" colspan=1>' + (is_custom ? (category_name.toUpperCase()) : ('TOTAL ' + category_name.toUpperCase())) + '</td>';
         } else {
             html += '<tr style="border-top: 1px solid black">';
-            html += '<td style="font-size: 10pt" colspan=1>' + (is_custom ? (indent + category_name) : (indent + 'Total ' + category_name)) + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>' + (is_custom ? (indent + category_name) : (indent + 'Total ' + category_name)) + '</td>';
         }
 
         if (mode == "year_to_date") {
             for (let i = 0; i < 4; i++) {
-                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
-                html += '<td style="text-align: right; font-size: 10pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
+                html += '<td style="font-size: 9pt" colspan=1>' + values[i] + '</td>';
+                html += '<td style="text-align: right; font-size: 9pt" colspan=1>' + validate_number(percentages[i]) + '</td>';
             }
         } else if (mode == "trailing_12_months") {
             for (let i = 0; i < category_total.length; i++)
-                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
-            html += '<td style="font-size: 10pt" colspan=1>100%</td>';
+                html += '<td style="font-size: 9pt" colspan=1>' + values[i] + '</td>';
+            html += '<td style="font-size: 9pt" colspan=1>100%</td>';
         } else if (mode == "balance_sheet") {
             for (let i = 0; i < 2; i++)
-                html += '<td style="font-size: 10pt" colspan=1>' + values[i] + '</td>';
+                html += '<td style="font-size: 9pt" colspan=1>' + values[i] + '</td>';
         }
     }
     html += '</tr>';
@@ -1642,15 +1642,15 @@ function append_equity_section(dataset) {
             if (dataset[i]["account"]) {
                 if (dataset[i]["account"].includes(provisional)) {
                     html += '<tr>';
-                    html += '<td style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
+                    html += '<td style="font-weight: normal; font-size: 9pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
                     html += '</tr>';
                 } else if (dataset[i]["account"].includes(equity)) {
                     html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-                    html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
+                    html += '<td style="font-weight: bold; font-size: 9pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][prev_month_year])) + '</td>';
                     html += '</tr>';
                 }  
             }
@@ -1660,15 +1660,15 @@ function append_equity_section(dataset) {
             if (dataset[i]["account"]) {
                 if (dataset[i]["account"].includes(provisional)) {
                     html += '<tr>';
-                    html += '<td style="font-weight: normal; font-size: 10pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
+                    html += '<td style="font-weight: normal; font-size: 9pt" colspan=1>' + indent + 'Retained Earnings' + '</td>';
                     html += '<td colspan=1></td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
                     html += '</tr>';
                 } else if (dataset[i]["account"].includes(equity)) {
                     html += '<tr style="border-top: 1px solid black; border-bottom: 3px solid black">';
-                    html += '<td style="font-weight: bold; font-size: 10pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
+                    html += '<td style="font-weight: bold; font-size: 9pt" colspan=1>' + ('Total Liabilities and Equity').toUpperCase() + '</td>';
                     html += '<td colspan=1></td>';
-                    html += '<td style="font-size: 10pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
+                    html += '<td style="font-size: 9pt" colspan=1>' + nf.format(Math.round(dataset[i][curr_month_year])) + '</td>';
                     html += '</tr>';
                 }  
             }
@@ -1722,17 +1722,17 @@ function append_cogs_section(dataset, mode) {
     if (filters.report_type == "Skinny") {
 
         html += '<tr>';
-        html += '<td style="font-size: 10pt" colspan=1>Cost of Goods Sold</td>';
-        html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[0] + '</td>';
+        html += '<td style="font-size: 9pt" colspan=1>Cost of Goods Sold</td>';
+        html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + total_cogs[0] + '</td>';
         html += "<td></td>";
-        html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[2] + '</td>';
+        html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + total_cogs[2] + '</td>';
         html += '</tr>';
 
         html += '<tr>';
-        html += '<td style="font-size: 10pt" colspan=1>Gross Margin</td>';
-        html += '<td style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[0] + '</td>';
+        html += '<td style="font-size: 9pt" colspan=1>Gross Margin</td>';
+        html += '<td style="font-size: 9pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[0] + '</td>';
         html += "<td></td>";
-        html += '<td style="font-size: 10pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[2] + '</td>';
+        html += '<td style="font-size: 9pt; text-align: right; border-top: 1px solid black" colspan=1>' + gross_margins[2] + '</td>';
         html += '</tr>';
         html += '<tr></tr>';
 
@@ -1740,18 +1740,18 @@ function append_cogs_section(dataset, mode) {
         if (mode == "year_to_date") {
     
             html += '<tr>';
-            html += '<td style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
+            html += '<td style="font-size: 9pt" colspan=1><b>Cost of Goods Sold<b></td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + total_cogs[i] + '</td>';
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[i] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + total_cogs[i] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + cogs_percentages[i] + '</td>';
             }
             html += '</tr>';
     
             html += '<tr style="border-top: 1px solid black">';
-            html += '<td style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
+            html += '<td style="font-size: 9pt" colspan=1><b>Gross Margin<b></td>';
             for (let i = 0; i < 4; i++) {
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + gross_margins[i] + '</td>';
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[i] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + gross_margins[i] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + percentages[i] + '</td>';
             }
             html += '</tr>';
             html += '<tr></tr>';
@@ -1786,17 +1786,17 @@ function append_cogs_section(dataset, mode) {
             cogs_percentages = [((total_cogs[12]/total_income[12]) * 100) + "%"];
 
             html += '<tr>';
-            html += '<td style="font-size: 10pt" colspan=1><b>Cost of Goods Sold<b></td>';
+            html += '<td style="font-size: 9pt" colspan=1><b>Cost of Goods Sold<b></td>';
             for (let i = 0; i < total_cogs.length; i++)
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(total_cogs[i]) + '</td>';
-            html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + cogs_percentages[0] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + nf.format(total_cogs[i]) + '</td>';
+            html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + cogs_percentages[0] + '</td>';
             html += '</tr>';
     
             html += '<tr style="border-top: 1px solid black">';
-            html += '<td style="font-size: 10pt" colspan=1><b>Gross Margin<b></td>';
+            html += '<td style="font-size: 9pt" colspan=1><b>Gross Margin<b></td>';
             for (let i = 0; i < total_cogs.length; i++)
-                html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + nf.format(global_gross_profit[i]) + '</td>';
-            html += '<td style="font-size: 10pt; text-align: right;" colspan=1>' + percentages[0] + '</td>';
+                html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + nf.format(global_gross_profit[i]) + '</td>';
+            html += '<td style="font-size: 9pt; text-align: right;" colspan=1>' + percentages[0] + '</td>';
             html += '</tr>';
             html += '<tr></tr>';
         }
