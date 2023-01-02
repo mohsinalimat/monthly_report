@@ -177,28 +177,28 @@ function gather_data(curr_thing_to_query = 0) {
         things_to_query.push(filters.cost_center[i]);
 
     if (curr_thing_to_query < things_to_query.length) {
-		frappe.show_progress('Generating Report', curr_thing_to_query, things_to_query.length, `Gathering data: ${things_to_query[curr_thing_to_query]}`);
+        frappe.show_progress('Generating Report', curr_thing_to_query, things_to_query.length, `Gathering data: ${things_to_query[curr_thing_to_query]}`);
 
         frappe.call({
-			method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_financial_report.run_queries',
-			args: {filters: filters, cost_center_name: things_to_query[curr_thing_to_query]},
+            method: 'monthly_report.monthly_report.report.monthly_financial_report.custom_monthly_financial_report.run_queries',
+            args: {filters: filters, cost_center_name: things_to_query[curr_thing_to_query]},
 
-			callback: function (r) {
-				_dataset.push(r.message[0]);
-				_dataset.push(remove_blank_entries(r.message[1]));
-				gather_data(++curr_thing_to_query);
-			}
+            callback: function (r) {
+                _dataset.push(r.message[0]);
+                _dataset.push(remove_blank_entries(r.message[1]));
+                gather_data(++curr_thing_to_query);
+            }
         })
     } else {
         generate_report([_dataset]);
 
         // Total execution time for display
-		var total_time = ((new Date()).getTime() - start_time.getTime()) / 1000;
-		var minutes = Math.floor(total_time / 60);
-		var seconds = Math.round(total_time - (minutes * 60));
-		var display_time = (minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} and ` : '') + `${seconds} second${seconds != 1 ? 's' : ''}`;
+        var total_time = ((new Date()).getTime() - start_time.getTime()) / 1000;
+        var minutes = Math.floor(total_time / 60);
+        var seconds = Math.round(total_time - (minutes * 60));
+        var display_time = (minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} and ` : '') + `${seconds} second${seconds != 1 ? 's' : ''}`;
 
-		frappe.show_progress('Generating Report', 1, 1, `Completed in ${display_time}`);
+        frappe.show_progress('Generating Report', 1, 1, `Completed in ${display_time}`);
     }
 }
 
