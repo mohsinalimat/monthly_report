@@ -150,6 +150,7 @@ frappe.query_reports["Monthly Financial Report"] = {
             } else {
                 start_time = new Date();
 
+                if (download_success)            frappe.throw('Please refresh the page before generating a new report');
                 if (!filters.period_end_month)   frappe.throw('Please select an ending month');
                 if (!filters.to_fiscal_year)     frappe.throw('Please select an ending year');
                 if (!filters.cost_center.length) frappe.throw('Please select at least one cost center');
@@ -207,6 +208,7 @@ function remove_blank_entries(dirty_dataset) {
 
 // initiates global variables
 function init_globals() {
+    console.log(filters);
     // date info needed to generate the tables
     month_name = (filters.period_end_month.slice(0, 3)).toLowerCase();
     curr_month_year = month_name + "_" + filters.to_fiscal_year;
@@ -215,8 +217,10 @@ function init_globals() {
     global_total_income = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     global_income_taxes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     global_gross_profit = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-
-    ttm_period = get_ttm_period(curr_month_year);
+    ttm_period          = get_ttm_period(curr_month_year);
+    tables_array        = []; 
+    current_table_id    = 0;
+    download_success    = false;
 }
 
 // (unused???) finds the names of categories
@@ -383,7 +387,7 @@ function generate_single_table(dataset, $table_id, title, mode, cost_center_name
         // the table containing all the data in html format
         html += '<div id="data">';
         html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-        html += generate_table_caption(title);
+        html += generate_table_caption(title, mode);
         html += generate_table_head(mode);
         html += generate_table_body(dataset, mode);
         html += '</table>';
@@ -392,7 +396,7 @@ function generate_single_table(dataset, $table_id, title, mode, cost_center_name
     } else {
         html += '<div id="data">';
         html += '<table style="font-weight: normal; font-family: Calibri; font-size: 10pt" id=' + $table_id + '>';
-        html += generate_table_caption((cost_center_name.slice(5, -5) + " Income Statement"));
+        html += generate_table_caption((cost_center_name.slice(5, -5) + " Income Statement"), mode);
         html += generate_table_head(mode);
 
         mode == "year_to_date" ? start_index = 0 : start_index = 1;
@@ -423,7 +427,7 @@ function generate_table_css() {
 }
 
 // generates the table's caption on top
-function generate_table_caption(title) {
+function generate_table_caption(title, mode) {
     var table_caption = "";
     var date = get_last_date(filters.period_end_month, filters.to_fiscal_year);
     var span = (contents = "") => { return '<span style="font-family: Calibri; font-size: 10pt; text-align: left;">' + contents + '</span>'; }
