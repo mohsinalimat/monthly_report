@@ -12,7 +12,6 @@ var include_timestamp = 0;
 // GLOBAL VARIABLES
 // ============================================================================================================================================
 
-
 var indent              = "&nbsp;&nbsp;&nbsp;&nbsp;"; // prints an indent of 4 spaces
 var start_time;
 var filters
@@ -29,17 +28,7 @@ var current_table_id    = 0;
 var number_format       = new Intl.NumberFormat('en-US'); // number format definition
 var download_success    = false;
 
-const validate_number = (number) => {
-    try {
-        if (number.includes("NaN") || number.includes("100.00") || number.includes("Infinity"))
-            return "100%";
-        else if (number.toString().slice(0, -1) == "0.00")
-            return "0%";
-        else
-            return number;
-    } catch(err) {}
-}
-
+// years to go in the filter
 const filter_years = () => {
     let years_in_filter = [];
     let curr_year = (new Date().getFullYear());
@@ -50,6 +39,7 @@ const filter_years = () => {
     return years_in_filter;
 }
 
+// months to go in the filter
 const filter_months = () => {
     return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 }
@@ -164,7 +154,7 @@ frappe.query_reports["Monthly Financial Report"] = {
                 if (!filters.to_fiscal_year)     frappe.throw('Please select an ending year');
                 if (!filters.cost_center.length) frappe.throw('Please select at least one cost center');
     
-                // gather_data();
+                gather_data();
             }
         });
     }
@@ -1883,24 +1873,6 @@ function append_cogs_section(dataset, mode) {
 // ============================================================================================================================================
 
 
-// wait for the given amount of milliseconds
-const wait = (ms) => {
-    const start = Date.now();
-    let now = start;
-
-    while (now - start < ms)
-        now = Date.now();
-}
-
-// return a string with each word capitalized
-const capitialize_each_word = (word) => {
-    text = word.toLowerCase();
-    text = text.split(" ").map((e) => e.charAt(0).toUpperCase() + e.substring(1)).join(" "); // process each word
-    text = text.split("-").map((e) => e.charAt(0).toUpperCase() + e.substring(1)).join("-"); // process hyphens
-
-    return text;
-};
-
 // assign names to each sheet based on cost center // exports the excel file
 const tables_to_excel = (function () {
     var uri = 'data:application/vnd.ms-excel;base64,',
@@ -2030,6 +2002,36 @@ Content-Type: text/xml; charset="utf-8"
     }
 })();
 
+// wait for the given amount of milliseconds
+function wait(ms) {
+    const start = Date.now();
+    let now = start;
+
+    while (now - start < ms)
+        now = Date.now();
+}
+
+// return a string with each word capitalized
+function capitialize_each_word(word) {
+    text = word.toLowerCase();
+    text = text.split(" ").map((e) => e.charAt(0).toUpperCase() + e.substring(1)).join(" "); // process each word
+    text = text.split("-").map((e) => e.charAt(0).toUpperCase() + e.substring(1)).join("-"); // process hyphens
+
+    return text;
+}
+
+// replace invalid numbers or add formatting
+function validate_number(number) {
+    try {
+        if (number.includes("NaN") || number.includes("100.00") || number.includes("Infinity"))
+            return "100%";
+        else if (number.toString().slice(0, -1) == "0.00")
+            return "0%";
+        else
+            return number;
+    } catch(err) {}
+}
+
 // so that I can just click export without filling in filters
 function test_run() {
     filters.cost_center = [
@@ -2048,6 +2050,5 @@ function test_run() {
     }
     generate_report([_dataset]);
 }
-
 
 var test_dataset = [{}];
